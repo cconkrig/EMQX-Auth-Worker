@@ -1,3 +1,5 @@
+[![Deploy Cloudflare Worker](https://github.com/EMQX-Auth-Worker/actions/workflows/deploy.yml/badge.svg?branch=main)](https://github.com/EMQX-Auth-Worker/actions/workflows/deploy.yml)
+
 # EMQX Auth Worker (Cloudflare)
 
 This Cloudflare Worker provides HTTP endpoints for EMQX authentication and ACL checks, backed by Cloudflare KV (free tier compatible).
