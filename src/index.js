@@ -1,4 +1,6 @@
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import { readFileSync } from "fs";
 
 // CORS and security headers
 const corsHeaders = {
@@ -88,6 +90,143 @@ function validateTopic(topic) {
     topic.length <= 256 &&
     /^[^\u0000-\u001F\u007F]+$/.test(topic)
   );
+}
+
+async function serveStatic(request, env) {
+  // Serve files from static/ for /admin and /admin/*
+  const url = new URL(request.url);
+  let filePath = url.pathname.replace(/^\/admin/, "");
+  if (!filePath || filePath === "/") filePath = "/index.html";
+  try {
+    const file = await env.ASSETS.get(filePath.slice(1), { type: "arrayBuffer" });
+    if (!file) return new Response("Not found", { status: 404 });
+    // Basic content type detection
+    let type = "text/plain";
+    if (filePath.endsWith(".html")) type = "text/html";
+    if (filePath.endsWith(".js")) type = "application/javascript";
+    if (filePath.endsWith(".css")) type = "text/css";
+    if (filePath.endsWith(".json")) type = "application/json";
+    return new Response(file, { status: 200, headers: { "Content-Type": type } });
+  } catch {
+    return new Response("Not found", { status: 404 });
+  }
+}
+
+function getJwtFromRequest(request) {
+  const auth = request.headers.get("Authorization") || "";
+  if (auth.startsWith("Bearer ")) return auth.slice(7);
+  return null;
+}
+
+function requireAdmin(request, env) {
+  const token = getJwtFromRequest(request);
+  if (!token) return null;
+  try {
+    const payload = jwt.verify(token, env.JWT_SECRET);
+    if (payload.roles && payload.roles.includes("admin")) return payload;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function handleAdminApi(request, env) {
+  const url = new URL(request.url);
+  if (url.pathname === "/admin/api/login" && request.method === "POST") {
+    const { username, password } = await request.json();
+    if (!username || !password) {
+      return jsonResponse({ error: "Missing credentials" }, 400);
+    }
+    const adminRaw = await env.USERS.get(`admin:${username}`);
+    if (!adminRaw) {
+      return jsonResponse({ error: "Invalid credentials" }, 401);
+    }
+    let admin;
+    try {
+      admin = JSON.parse(adminRaw);
+    } catch {
+      return jsonResponse({ error: "Corrupt admin data" }, 500);
+    }
+    const ok = await bcrypt.compare(password, admin.password_hash);
+    if (!ok) {
+      return jsonResponse({ error: "Invalid credentials" }, 401);
+    }
+    const token = jwt.sign({ username, roles: admin.roles || [] }, env.JWT_SECRET, { expiresIn: "1h" });
+    return jsonResponse({ token });
+  }
+
+  // All other endpoints require admin JWT
+  const admin = requireAdmin(request, env);
+  if (!admin) return jsonResponse({ error: "Unauthorized" }, 401);
+
+  // Audit log helper
+  function audit(action, target) {
+    console.log(`[AUDIT] admin=${admin.username} action=${action} target=${target || ''}`);
+  }
+
+  if (url.pathname === "/admin/api/user" && request.method === "POST") {
+    try {
+      const { username, password, acls } = await request.json();
+      if (!username || !password) return jsonResponse({ error: "Missing username or password" }, 400);
+      const hash = await bcrypt.hash(password, 12);
+      const userObj = { password_hash: hash, acls: Array.isArray(acls) ? acls : [] };
+      await env.USERS.put(`user:${username}`, JSON.stringify(userObj));
+      audit('create_or_update_user', username);
+      return jsonResponse({ success: true });
+    } catch (e) {
+      return jsonResponse({ error: e.message || 'Error creating/updating user' }, 500);
+    }
+  }
+  if (url.pathname === "/admin/api/user" && request.method === "DELETE") {
+    try {
+      const { username } = await request.json();
+      if (!username) return jsonResponse({ error: "Missing username" }, 400);
+      await env.USERS.delete(`user:${username}`);
+      audit('delete_user', username);
+      return jsonResponse({ success: true });
+    } catch (e) {
+      return jsonResponse({ error: e.message || 'Error deleting user' }, 500);
+    }
+  }
+  if (url.pathname === "/admin/api/acl" && request.method === "POST") {
+    try {
+      const { username, acls } = await request.json();
+      if (!username || !Array.isArray(acls)) return jsonResponse({ error: "Missing username or acls" }, 400);
+      const userRaw = await env.USERS.get(`user:${username}`);
+      if (!userRaw) return jsonResponse({ error: "User not found" }, 404);
+      let user;
+      try { user = JSON.parse(userRaw); } catch { return jsonResponse({ error: "Corrupt user data" }, 500); }
+      user.acls = acls;
+      await env.USERS.put(`user:${username}`, JSON.stringify(user));
+      audit('update_acls', username);
+      return jsonResponse({ success: true });
+    } catch (e) {
+      return jsonResponse({ error: e.message || 'Error updating ACLs' }, 500);
+    }
+  }
+  if (url.pathname === "/admin/api/users" && request.method === "GET") {
+    try {
+      const list = await env.USERS.list({ prefix: "user:" });
+      const usernames = list.keys.map(k => k.name.slice(5));
+      return jsonResponse({ users: usernames });
+    } catch (e) {
+      return jsonResponse({ error: e.message || 'Error listing users' }, 500);
+    }
+  }
+  if (url.pathname === "/admin/api/user-details" && request.method === "GET") {
+    try {
+      const username = url.searchParams.get('username');
+      if (!username) return jsonResponse({ error: "Missing username" }, 400);
+      const userRaw = await env.USERS.get(`user:${username}`);
+      if (!userRaw) return jsonResponse({ error: "User not found" }, 404);
+      let user;
+      try { user = JSON.parse(userRaw); } catch { return jsonResponse({ error: "Corrupt user data" }, 500); }
+      return jsonResponse({ username, acls: user.acls || [] });
+    } catch (e) {
+      return jsonResponse({ error: e.message || 'Error fetching user details' }, 500);
+    }
+  }
+  return new Response("Not found", { status: 404 });
 }
 
 export default {
@@ -210,6 +349,13 @@ export default {
           incrementRateLimit(ip);
         }
         return jsonResponse({ result: allowed ? "allow" : "deny" }, 200);
+      }
+
+      if (url.pathname.startsWith("/admin/api")) {
+        return await handleAdminApi(request, env);
+      }
+      if (url.pathname === "/admin" || url.pathname.startsWith("/admin/")) {
+        return await serveStatic(request, env);
       }
 
       return new Response("Not found", { status: 404, headers: corsHeaders });

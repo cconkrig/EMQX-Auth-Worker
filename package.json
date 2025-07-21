@@ -4,6 +4,15 @@
   "type": "module",
   "main": "src/index.js",
   "dependencies": {
-    "bcryptjs": "^2.4.3"
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "svelte": "^4.0.0",
+    "vite": "^4.0.0"
+  },
+  "scripts": {
+    "dev": "vite --config src/admin/vite.config.js",
+    "build": "vite build --config src/admin/vite.config.js"
   }
 } 

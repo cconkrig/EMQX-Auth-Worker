@@ -2,11 +2,12 @@
 
 # EMQX Auth Worker (Cloudflare)
 
-This Cloudflare Worker provides HTTP endpoints for EMQX authentication and ACL checks, backed by Cloudflare KV (free tier compatible).
+This Cloudflare Worker provides HTTP endpoints for EMQX authentication and ACL checks, backed by Cloudflare KV (free tier compatible), and a secure Svelte-based admin UI for user/ACL management.
 
 ## Features
 - `/auth` endpoint: Verifies username/password using bcrypt hash from KV
 - `/acl` endpoint: Checks if a user is allowed to publish/subscribe to a topic
+- **Admin UI at `/admin`**: Svelte SPA for login, user/ACL management, and audit logging
 - CORS enabled
 - Logging via `console.log` (viewable in Cloudflare dashboard)
 - Minimal KV reads (1 per request)
@@ -14,6 +15,22 @@ This Cloudflare Worker provides HTTP endpoints for EMQX authentication and ACL c
 - **Rate limiting**: Only failed requests count toward the per-IP limit
 - **Custom domain routing**: Route your Worker to a custom domain using a GitHub Actions variable
 - **Advanced logging**: Cloudflare Workers Logs enabled for full observability
+
+## Admin UI
+
+The `/admin` route serves a Svelte-based admin panel for managing users and ACLs.
+- **Login**: JWT-protected login for admin users (credentials stored in KV as `admin:<username>`)
+- **User management**: List, create, update, and delete users
+- **ACL management**: View, add, update, and remove ACLs for each user
+- **Audit logging**: All admin actions are logged to the console for traceability
+- **Confirmation dialogs**: Deleting a user requires confirmation
+- **Error/success feedback**: All actions show clear feedback
+
+To build the admin UI:
+```sh
+npm run build
+```
+This will output the static assets to `static/` for the Worker to serve.
 
 ## KV Data Model
 - **Key:** `user:<username>`
@@ -25,6 +42,14 @@ This Cloudflare Worker provides HTTP endpoints for EMQX authentication and ACL c
       { "action": "subscribe", "topic": "sports/#" },
       { "action": "publish", "topic": "updates/user/kit" }
     ]
+  }
+  ```
+- **Key:** `admin:<username>`
+- **Value:**
+  ```json
+  {
+    "password_hash": "bcrypt$2b$12$...",
+    "roles": ["admin"]
   }
   ```
 
@@ -47,6 +72,7 @@ This Cloudflare Worker provides HTTP endpoints for EMQX authentication and ACL c
      - **Secret:** `EMQX_AUTH_API_KEY` (set to your desired Bearer token for EMQX)
      - **Secret:** `CLOUDFLARE_API_TOKEN` (Cloudflare API token for deployment)
      - **Secret:** `CLOUDFLARE_ACCOUNT_ID` (Cloudflare account ID)
+     - **Secret:** `JWT_SECRET` (secret for signing admin JWTs)
 
 4. **Configure wrangler.toml:**
    - The `id` field for the KV namespace is set to `$EMQX_KV_NAMESPACE_ID` and the custom domain is set via the `routes` array with `$EMQX_CUSTOM_DOMAIN`. Both will be replaced at deploy time by the workflow.
@@ -61,19 +87,22 @@ This Cloudflare Worker provides HTTP endpoints for EMQX authentication and ACL c
      binding = "USERS"
      id = "$EMQX_KV_NAMESPACE_ID"
 
-     [[observability]]
+     [observability.logs]
      enabled = true
      head_sampling_rate = 1 # 100% sampling rate
      ```
 
 5. **Deploy (CI/CD):**
    - On push to `main`, GitHub Actions will:
+     - Build the Svelte admin UI (`npm run build`)
      - Substitute the KV namespace ID and custom domain into `wrangler.toml` using `envsubst`.
      - Set the Worker secret `API_KEY` to the value of `EMQX_AUTH_API_KEY`.
+     - Set the Worker secret `JWT_SECRET` for admin JWTs.
      - Deploy the Worker using Wrangler.
 
 6. **Upload users to KV:**
    - Use the Cloudflare dashboard or API to add user records as shown above.
+   - To add an admin, store a record as `admin:<username>` with a bcrypt-hashed password and `roles: ["admin"]`.
 
 ## Endpoints
 
@@ -85,30 +114,13 @@ This Cloudflare Worker provides HTTP endpoints for EMQX authentication and ACL c
 - **Body:** `{ "username": "...", "action": "publish|subscribe", "topic": "..." }`
 - **Response:** `{ "result": "allow" }` or `{ "result": "deny" }`
 
-## EMQX HTTP Auth Example
-
-```yaml
-auth:
-  http:
-    enable: true
-    auth_req:
-      url: "https://<your-worker-url>/auth"
-      method: post
-      headers:
-        Authorization: "Bearer <your-api-key>"
-      body:
-        username: "%u"
-        password: "%P"
-    acl_req:
-      url: "https://<your-worker-url>/acl"
-      method: post
-      headers:
-        Authorization: "Bearer <your-api-key>"
-      body:
-        username: "%u"
-        action: "%A"
-        topic: "%t"
-```
+### **Admin API Endpoints**
+- `/admin/api/login` (POST): Admin login, returns JWT
+- `/admin/api/user` (POST): Create/update user (JWT required)
+- `/admin/api/user` (DELETE): Delete user (JWT required)
+- `/admin/api/acl` (POST): Update ACLs for a user (JWT required)
+- `/admin/api/users` (GET): List all users (JWT required)
+- `/admin/api/user-details?username=...` (GET): Get a user's ACLs (JWT required)
 
 ## Custom Domains
 
@@ -124,10 +136,10 @@ For more details and advanced usage, see the [Cloudflare Custom Domains document
 
 ## Advanced Logging (Workers Logs)
 
-Cloudflare [Workers Logs](https://developers.cloudflare.com/workers/observability/logs/workers-logs/) are enabled for this Worker via the `[[observability]]` section in `wrangler.toml`:
+Cloudflare [Workers Logs](https://developers.cloudflare.com/workers/observability/logs/workers-logs/) are enabled for this Worker via the `[observability.logs]` section in `wrangler.toml`:
 
 ```toml
-[[observability]]
+[observability.logs]
 enabled = true
 head_sampling_rate = 1 # 100% sampling rate
 ```
@@ -137,8 +149,10 @@ You can view logs in the Cloudflare dashboard under Workers > your Worker > Logs
 ## CI/CD Configuration
 
 - The GitHub Actions workflow will:
+  - Build the Svelte admin UI (`npm run build`)
   - Use `envsubst` to inject the values of `EMQX_KV_NAMESPACE_ID` and `EMQX_CUSTOM_DOMAIN` into `wrangler.toml` before deployment.
   - Set the Worker secret `API_KEY` from the `EMQX_AUTH_API_KEY` secret.
+  - Set the Worker secret `JWT_SECRET` for admin JWTs.
   - Deploy using the Cloudflare API token and account ID.
 - **No sensitive values are hardcoded.**
 - To change the KV namespace, custom domain, or API key, update the corresponding GitHub variable/secret.
@@ -146,7 +160,8 @@ You can view logs in the Cloudflare dashboard under Workers > your Worker > Logs
 ## Logging
 - All requests and results are logged with `console.log`.
 - Logs are always enabled in Cloudflare Workers and can be viewed in the Cloudflare dashboard or with `wrangler tail`.
+- **Admin actions are audit-logged to the console.**
 
 ## Notes
 - This worker is designed for the Cloudflare free tier (100k reads/day, 1k writes/day, 1GB storage).
-- No user management API is included; manage users via KV dashboard or scripts. 
+- No user management API is included; manage users via KV dashboard or scripts if not using the admin UI. 
