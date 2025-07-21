@@ -241,12 +241,16 @@ export default {
     // Cleanup rate limiter map
     cleanupRateLimitMap();
 
-    // Serve static admin UI for GET requests to /admin and /admin/*
+    // Serve static admin UI for GET requests to /admin and /admin/* using ASSETS binding
     if (
       (url.pathname === "/admin" || url.pathname.startsWith("/admin/")) &&
       request.method === "GET"
     ) {
-      return await serveStatic(request, env);
+      // Rewrite /admin to /admin/index.html for SPA entry
+      let assetPath = url.pathname;
+      if (assetPath === "/admin") assetPath = "/admin/index.html";
+      const assetRequest = new Request(new URL(assetPath, request.url), request);
+      return await env.ASSETS.fetch(assetRequest);
     }
 
     // Handle admin API (POST/GET as needed)
