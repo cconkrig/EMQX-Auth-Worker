@@ -4,8 +4,9 @@ import path from 'path';
 
 export default defineConfig({
   root: __dirname,
+  base: '/admin/', // Ensure all assets are referenced from /admin/
   build: {
-    outDir: path.resolve(__dirname, '../../static'),
+    outDir: path.resolve(__dirname, '../../static/admin'),
     emptyOutDir: true
   },
   plugins: [svelte()]

@@ -179,7 +179,7 @@
     <ul>
       {#each users as user}
         <li style="{selectedUser === user ? 'font-weight:bold' : ''}">
-          <span on:click={() => selectUser(user)} style="cursor:pointer">{user}</span>
+          <button type="button" on:click={() => selectUser(user)} aria-label="Select user {user}" style="cursor:pointer; background:none; border:none; padding:0; font:inherit; text-align:left;{selectedUser === user ? 'font-weight:bold' : ''}">{user}</button>
           <button on:click={() => deleteUser(user)}>{confirmDelete === user ? 'Confirm Delete' : 'Delete'}</button>
         </li>
       {/each}

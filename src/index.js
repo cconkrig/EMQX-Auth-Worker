@@ -249,6 +249,7 @@ export default {
       // Rewrite /admin to /admin/index.html for SPA entry
       let assetPath = url.pathname;
       if (assetPath === "/admin") assetPath = "/admin/index.html";
+      // All static assets are now under /admin/
       const assetRequest = new Request(new URL(assetPath, request.url), request);
       return await env.ASSETS.fetch(assetRequest);
     }
