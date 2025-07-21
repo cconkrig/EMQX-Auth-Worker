@@ -241,13 +241,30 @@ export default {
     // Cleanup rate limiter map
     cleanupRateLimitMap();
 
+    // Serve static admin UI for GET requests to /admin and /admin/*
+    if (
+      (url.pathname === "/admin" || url.pathname.startsWith("/admin/")) &&
+      request.method === "GET"
+    ) {
+      return await serveStatic(request, env);
+    }
+
+    // Handle admin API (POST/GET as needed)
+    if (url.pathname.startsWith("/admin/api")) {
+      return await handleAdminApi(request, env);
+    }
+
     // Handle CORS preflight
     if (request.method === "OPTIONS") {
       return new Response(null, { headers: corsHeaders });
     }
 
-    // Only allow POST and OPTIONS
-    if (request.method !== "POST" && request.method !== "OPTIONS") {
+    // Only allow POST and OPTIONS for /auth and /acl
+    if (
+      (url.pathname === "/auth" || url.pathname === "/acl") &&
+      request.method !== "POST" &&
+      request.method !== "OPTIONS"
+    ) {
       return new Response("Method Not Allowed", { status: 405, headers: corsHeaders });
     }
 
@@ -353,13 +370,6 @@ export default {
           incrementRateLimit(ip);
         }
         return jsonResponse({ result: allowed ? "allow" : "deny" }, 200);
-      }
-
-      if (url.pathname.startsWith("/admin/api")) {
-        return await handleAdminApi(request, env);
-      }
-      if (url.pathname === "/admin" || url.pathname.startsWith("/admin/")) {
-        return await serveStatic(request, env);
       }
 
       return new Response("Not found", { status: 404, headers: corsHeaders });
