@@ -9,7 +9,7 @@ workers_dev = false
 preview_urls = false
 
 [assets]
-base_path = "./static"
+directory = "./static"
 binding = "ASSETS"
 
 [[kv_namespaces]]
