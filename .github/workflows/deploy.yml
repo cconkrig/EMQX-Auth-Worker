@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       # Set this in your GitHub Actions secrets or variables
-      EMQX_KV_NAMESPACE_ID: ${{ secrets.EMQX_KV_NAMESPACE_ID }}
+      EMQX_KV_NAMESPACE_ID: ${{ vars.EMQX_KV_NAMESPACE_ID }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -26,12 +26,18 @@ jobs:
       - name: Install Wrangler
         run: npm install -g wrangler
 
+      - name: Substitute KV namespace ID in wrangler.toml
+        run: |
+          export EMQX_KV_NAMESPACE_ID="$EMQX_KV_NAMESPACE_ID"
+          envsubst < wrangler.toml > wrangler.toml.tmp
+          mv wrangler.toml.tmp wrangler.toml
+
       - name: Set API_KEY secret for Worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           EMQX_AUTH_API_KEY: ${{ secrets.EMQX_AUTH_API_KEY }}
-          EMQX_KV_NAMESPACE_ID: ${{ secrets.EMQX_KV_NAMESPACE_ID }}
+          EMQX_KV_NAMESPACE_ID: ${{ vars.EMQX_KV_NAMESPACE_ID }}
         run: |
           echo "$EMQX_AUTH_API_KEY" | wrangler secret put API_KEY
 
@@ -39,6 +45,6 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          EMQX_KV_NAMESPACE_ID: ${{ secrets.EMQX_KV_NAMESPACE_ID }}
+          EMQX_KV_NAMESPACE_ID: ${{ vars.EMQX_KV_NAMESPACE_ID }}
         run: |
           wrangler deploy --minify 

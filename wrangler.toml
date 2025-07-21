@@ -4,4 +4,4 @@ compatibility_date = "2024-06-01"
 
 [[kv_namespaces]]
 binding = "USERS"
-id = "${{ env.EMQX_KV_NAMESPACE_ID }}" # Set via GitHub Actions environment variable 
+id = "$EMQX_KV_NAMESPACE_ID" 
