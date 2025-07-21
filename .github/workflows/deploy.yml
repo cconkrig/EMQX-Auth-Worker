@@ -44,7 +44,7 @@ jobs:
           EMQX_AUTH_API_KEY: ${{ secrets.EMQX_AUTH_API_KEY }}
           EMQX_KV_NAMESPACE_ID: ${{ vars.EMQX_KV_NAMESPACE_ID }}
           EMQX_CUSTOM_DOMAIN: ${{ vars.EMQX_CUSTOM_DOMAIN }}
-        run: |d
+        run: |
           echo "$EMQX_AUTH_API_KEY" | wrangler secret put API_KEY
 
       - name: Publish to Cloudflare Workers
