@@ -1,7 +1,14 @@
 name = "emqx-auth-worker"
 main = "src/index.js"
 compatibility_date = "2024-06-01"
+routes = [
+    { pattern = "$EMQX_CUSTOM_DOMAIN", custom_domain = true }
+]
 
 [[kv_namespaces]]
 binding = "USERS"
-id = "$EMQX_KV_NAMESPACE_ID" 
+id = "$EMQX_KV_NAMESPACE_ID"
+
+[[observability]]
+enabled = true
+head_sampling_rate = 1
