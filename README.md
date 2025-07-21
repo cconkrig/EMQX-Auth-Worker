@@ -8,6 +8,8 @@ This Cloudflare Worker provides HTTP endpoints for EMQX authentication and ACL c
 - CORS enabled
 - Logging via `console.log` (viewable in Cloudflare dashboard)
 - Minimal KV reads (1 per request)
+- **API key protected**: Only requests with the correct Bearer token are allowed
+- **Rate limiting**: Only failed requests count toward the per-IP limit
 
 ## KV Data Model
 - **Key:** `user:<username>`
@@ -29,16 +31,29 @@ This Cloudflare Worker provides HTTP endpoints for EMQX authentication and ACL c
    npm install
    ```
 
-2. **Configure KV:**
+2. **Configure Cloudflare KV:**
    - Create a KV namespace in the Cloudflare dashboard.
-   - Copy the namespace ID into `wrangler.toml` under `id` for the `USERS` binding.
+   - Copy the namespace ID (not the name) for use in CI/CD.
 
-3. **Deploy:**
-   ```sh
-   npx wrangler deploy
-   ```
+3. **Configure GitHub Repository Variables/Secrets:**
+   - Go to your GitHub repo → Settings → Secrets and variables → Actions.
+   - Add the following:
+     - **Variable:** `EMQX_KV_NAMESPACE_ID` (set to your Cloudflare KV namespace ID)
+     - **Secret:** `EMQX_AUTH_API_KEY` (set to your desired Bearer token for EMQX)
+     - **Secret:** `CLOUDFLARE_API_TOKEN` (Cloudflare API token for deployment)
+     - **Secret:** `CLOUDFLARE_ACCOUNT_ID` (Cloudflare account ID)
 
-4. **Upload users to KV:**
+4. **Configure wrangler.toml:**
+   - The `id` field for the KV namespace is set to `$EMQX_KV_NAMESPACE_ID` and will be replaced at deploy time by the workflow.
+   - The `binding` field (e.g., `USERS`) is the variable name used in the Worker code and does not need to match the dashboard name.
+
+5. **Deploy (CI/CD):**
+   - On push to `main`, GitHub Actions will:
+     - Substitute the KV namespace ID into `wrangler.toml` using `envsubst`.
+     - Set the Worker secret `API_KEY` to the value of `EMQX_AUTH_API_KEY`.
+     - Deploy the Worker using Wrangler.
+
+6. **Upload users to KV:**
    - Use the Cloudflare dashboard or API to add user records as shown above.
 
 ## Endpoints
@@ -60,17 +75,30 @@ auth:
     auth_req:
       url: "https://<your-worker-url>/auth"
       method: post
+      headers:
+        Authorization: "Bearer <your-api-key>"
       body:
         username: "%u"
         password: "%P"
     acl_req:
       url: "https://<your-worker-url>/acl"
       method: post
+      headers:
+        Authorization: "Bearer <your-api-key>"
       body:
         username: "%u"
         action: "%A"
         topic: "%t"
 ```
+
+## CI/CD Configuration
+
+- The GitHub Actions workflow will:
+  - Use `envsubst` to inject the value of `EMQX_KV_NAMESPACE_ID` into `wrangler.toml` before deployment.
+  - Set the Worker secret `API_KEY` from the `EMQX_AUTH_API_KEY` secret.
+  - Deploy using the Cloudflare API token and account ID.
+- **No sensitive values are hardcoded.**
+- To change the KV namespace or API key, update the corresponding GitHub variable/secret.
 
 ## Logging
 - All requests and results are logged with `console.log`.
