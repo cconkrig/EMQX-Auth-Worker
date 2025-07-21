@@ -1,6 +1,5 @@
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-import { readFileSync } from "fs";
+import { SignJWT, jwtVerify } from 'jose';
 
 // CORS and security headers
 const corsHeaders = {
@@ -118,11 +117,12 @@ function getJwtFromRequest(request) {
   return null;
 }
 
-function requireAdmin(request, env) {
+async function requireAdmin(request, env) {
   const token = getJwtFromRequest(request);
   if (!token) return null;
   try {
-    const payload = jwt.verify(token, env.JWT_SECRET);
+    const secret = new TextEncoder().encode(env.JWT_SECRET);
+    const { payload } = await jwtVerify(token, secret);
     if (payload.roles && payload.roles.includes("admin")) return payload;
     return null;
   } catch {
@@ -151,12 +151,16 @@ async function handleAdminApi(request, env) {
     if (!ok) {
       return jsonResponse({ error: "Invalid credentials" }, 401);
     }
-    const token = jwt.sign({ username, roles: admin.roles || [] }, env.JWT_SECRET, { expiresIn: "1h" });
+    const secret = new TextEncoder().encode(env.JWT_SECRET);
+    const token = await new SignJWT({ username, roles: admin.roles || [] })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setExpirationTime('1h')
+      .sign(secret);
     return jsonResponse({ token });
   }
 
   // All other endpoints require admin JWT
-  const admin = requireAdmin(request, env);
+  const admin = await requireAdmin(request, env);
   if (!admin) return jsonResponse({ error: "Unauthorized" }, 401);
 
   // Audit log helper
