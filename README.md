@@ -1,4 +1,4 @@
-[![Deploy Cloudflare Worker](https://github.com/cconk/EMQX-Auth-Worker/actions/workflows/deploy.yml/badge.svg?branch=main)](https://github.com/cconk/EMQX-Auth-Worker/actions/workflows/deploy.yml)
+[![Deploy Cloudflare Worker](https://github.com/cconkrig/EMQX-Auth-Worker/actions/workflows/deploy.yml/badge.svg?branch=main)](https://github.com/cconkrig/EMQX-Auth-Worker/actions/workflows/deploy.yml)
 
 # EMQX Auth Worker (Cloudflare)
 
