@@ -1,0 +1,9 @@
+{
+  "name": "emqx-auth-worker",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "src/index.js",
+  "dependencies": {
+    "bcryptjs": "^2.4.3"
+  }
+} 
