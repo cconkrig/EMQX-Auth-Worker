@@ -1,0 +1,35 @@
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Vite/Svelte build output
+static/
+dist/
+build/
+
+# Local env files
+.env
+.env.*
+
+# Mac/Windows/Editor junk
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Logs
+logs/
+*.log
+
+# Coverage
+coverage/
+
+# Optional: lock files (if you want to ignore them)
+# package-lock.json
+yarn.lock
+pnpm-lock.yaml 
