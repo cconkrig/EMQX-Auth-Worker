@@ -18,6 +18,13 @@
 	let dashboardLoading = false;
 	let userAclsString = '';
 
+	// ACL UI state
+	let aclAction = 'publish';
+	let aclTopic = '';
+	let aclEditIndex: number | null = null;
+	let aclEditAction = 'publish';
+	let aclEditTopic = '';
+
 	function getToken() {
 		return localStorage.getItem('admin_token');
 	}
@@ -175,9 +182,51 @@
 			dashboardLoading = false;
 		}
 	}
+
+	function resetAclForm() {
+		aclAction = 'publish';
+		aclTopic = '';
+		aclEditIndex = null;
+		aclEditAction = 'publish';
+		aclEditTopic = '';
+	}
+
+	function addAclRule() {
+		if (!aclTopic.trim()) return;
+		userAcls = [...userAcls, { action: aclAction, topic: aclTopic.trim() }];
+		userAclsString = JSON.stringify(userAcls, null, 2);
+		resetAclForm();
+	}
+
+	function startEditAclRule(i: number) {
+		aclEditIndex = i;
+		aclEditAction = userAcls[i].action;
+		aclEditTopic = userAcls[i].topic;
+	}
+
+	function saveEditAclRule() {
+		if (aclEditIndex === null || !aclEditTopic.trim()) return;
+		userAcls[aclEditIndex] = { action: aclEditAction, topic: aclEditTopic.trim() };
+		userAcls = [...userAcls];
+		userAclsString = JSON.stringify(userAcls, null, 2);
+		resetAclForm();
+	}
+
+	function deleteAclRule(i: number) {
+		userAcls.splice(i, 1);
+		userAcls = [...userAcls];
+		userAclsString = JSON.stringify(userAcls, null, 2);
+		resetAclForm();
+	}
 </script>
 
 <style>
+:global(html) {
+	font-family: 'Inter', 'Roboto', 'Segoe UI', 'Helvetica Neue', Arial, 'Liberation Sans', 'sans-serif';
+	background: #f1f5fa;
+	font-size: 18px;
+	color: #222;
+}
 .login-container {
 	display: flex;
 	flex-direction: column;
@@ -188,20 +237,22 @@
 }
 .login-box {
 	background: white;
-	padding: 2.5rem 2rem;
-	border-radius: 1.25rem;
-	box-shadow: 0 4px 32px rgba(0,0,0,0.08);
+	padding: 2.5rem 2.5rem;
+	border-radius: 1.5rem;
+	box-shadow: 0 8px 40px rgba(0,0,0,0.10);
 	width: 100%;
-	max-width: 350px;
+	max-width: 370px;
 	display: flex;
 	flex-direction: column;
-	gap: 1.25rem;
+	gap: 1.5rem;
 }
 .login-title {
-	font-size: 2rem;
-	font-weight: 700;
+	font-size: 2.2rem;
+	font-weight: 800;
 	color: #1e293b;
 	text-align: center;
+	margin-bottom: 0.5rem;
+	letter-spacing: -1px;
 }
 .input-group {
 	display: flex;
@@ -209,26 +260,30 @@
 	gap: 0.5rem;
 }
 input[type="text"], input[type="password"] {
-	padding: 0.75rem 1rem;
-	border: 1px solid #cbd5e1;
-	border-radius: 0.5rem;
-	font-size: 1rem;
+	padding: 0.85rem 1.1rem;
+	border: 1.5px solid #cbd5e1;
+	border-radius: 0.7rem;
+	font-size: 1.1rem;
 	outline: none;
 	transition: border 0.2s;
+	background: #f8fafc;
 }
 input:focus {
 	border-color: #2563eb;
+	background: #fff;
 }
 .login-btn {
-	background: #2563eb;
+	background: linear-gradient(90deg, #2563eb 60%, #60a5fa 100%);
 	color: white;
-	padding: 0.75rem 1rem;
+	padding: 0.9rem 1.1rem;
 	border: none;
-	border-radius: 0.5rem;
-	font-size: 1rem;
-	font-weight: 600;
+	border-radius: 0.7rem;
+	font-size: 1.1rem;
+	font-weight: 700;
 	cursor: pointer;
-	transition: background 0.2s;
+	transition: background 0.2s, box-shadow 0.2s;
+	box-shadow: 0 2px 8px rgba(37,99,235,0.08);
+	margin-top: 0.5rem;
 }
 .login-btn:disabled {
 	background: #93c5fd;
@@ -237,7 +292,8 @@ input:focus {
 .error {
 	color: #dc2626;
 	text-align: center;
-	font-size: 1rem;
+	font-size: 1.1rem;
+	margin-top: -0.5rem;
 }
 .dashboard-container {
 	display: flex;
@@ -250,20 +306,22 @@ input:focus {
 }
 .dashboard-box {
 	background: white;
-	padding: 2rem 2.5rem;
-	border-radius: 1.25rem;
-	box-shadow: 0 4px 32px rgba(0,0,0,0.08);
+	padding: 2.5rem 3rem;
+	border-radius: 1.5rem;
+	box-shadow: 0 8px 40px rgba(0,0,0,0.10);
 	width: 100%;
-	max-width: 700px;
+	max-width: 800px;
 	display: flex;
 	flex-direction: column;
-	gap: 2rem;
+	gap: 2.5rem;
 }
 .dashboard-title {
-	font-size: 2rem;
-	font-weight: 700;
+	font-size: 2.5rem;
+	font-weight: 800;
 	color: #1e293b;
 	text-align: center;
+	margin-bottom: 0.5rem;
+	letter-spacing: -1px;
 }
 .user-list {
 	display: flex;
@@ -358,6 +416,66 @@ input:focus {
 	font-size: 1rem;
 	margin-bottom: 1rem;
 }
+.acl-list {
+	margin-top: 1rem;
+	background: #f8fafc;
+	padding: 1rem;
+	border-radius: 1rem;
+	box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+.acl-rule {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	margin-bottom: 0.5rem;
+}
+.acl-action {
+	font-weight: 600;
+	color: #2563eb;
+}
+.acl-topic {
+	font-family: monospace;
+	background: #e0e7ef;
+	padding: 0.1rem 0.4rem;
+	border-radius: 0.3rem;
+}
+.edit-btn, .add-btn, .save-btn, .cancel-btn {
+	background: #2563eb;
+	color: white;
+	padding: 0.3rem 0.8rem;
+	border: none;
+	border-radius: 0.4rem;
+	font-size: 1rem;
+	font-weight: 600;
+	cursor: pointer;
+	margin-left: 0.2rem;
+	transition: background 0.2s;
+}
+.edit-btn { background: #64748b; }
+.add-btn { background: #059669; }
+.save-btn { background: #059669; }
+.cancel-btn { background: #f59e42; }
+.delete-btn { background: #dc2626; }
+.edit-btn:hover, .add-btn:hover, .save-btn:hover, .cancel-btn:hover, .delete-btn:hover {
+	filter: brightness(1.1);
+}
+input[type="text"], select {
+	padding: 0.5rem 0.75rem;
+	border: 1px solid #cbd5e1;
+	border-radius: 0.5rem;
+	font-size: 1rem;
+	margin-right: 0.2rem;
+}
+input[type="text"]:focus, select:focus {
+	border-color: #2563eb;
+	outline: none;
+}
+.acl-add-form {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	margin-top: 1rem;
+}
 </style>
 
 {#if !isLoggedIn}
@@ -407,8 +525,33 @@ input:focus {
 			{#if selectedUser}
 				<div>
 					<strong>ACLs for {selectedUser}:</strong>
-					<div class="acl-editor">
-						<textarea bind:value={userAclsString} />
+					<div class="acl-list">
+						{#each userAcls as rule, i}
+							<div class="acl-rule">
+								{#if aclEditIndex === i}
+									<select bind:value={aclEditAction}>
+										<option value="publish">publish</option>
+										<option value="subscribe">subscribe</option>
+									</select>
+									<input type="text" bind:value={aclEditTopic} placeholder="Topic" />
+									<button class="save-btn" on:click={saveEditAclRule}>Save</button>
+									<button class="delete-btn" on:click={() => deleteAclRule(i)}>Delete</button>
+									<button class="cancel-btn" on:click={resetAclForm}>Cancel</button>
+								{:else}
+									<span class="acl-action">{rule.action}</span> on <span class="acl-topic">{rule.topic}</span>
+									<button class="edit-btn" on:click={() => startEditAclRule(i)}>Edit</button>
+									<button class="delete-btn" on:click={() => deleteAclRule(i)}>Delete</button>
+								{/if}
+							</div>
+						{/each}
+						<div class="acl-add-form">
+							<select bind:value={aclAction}>
+								<option value="publish">publish</option>
+								<option value="subscribe">subscribe</option>
+							</select>
+							<input type="text" bind:value={aclTopic} placeholder="Topic" />
+							<button class="add-btn" on:click={addAclRule}>Add Rule</button>
+						</div>
 						<button class="save-btn" on:click={updateAcls} disabled={dashboardLoading}>Save ACLs</button>
 					</div>
 				</div>
