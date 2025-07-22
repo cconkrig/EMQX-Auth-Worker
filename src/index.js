@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from 'jose';
+import { getAssetFromKV } from '@cloudflare/kv-asset-handler';
 
 // CORS and security headers
 const corsHeaders = {
@@ -246,12 +247,7 @@ export default {
       (url.pathname === "/admin" || url.pathname.startsWith("/admin/")) &&
       request.method === "GET"
     ) {
-      // Rewrite /admin to /admin/index.html for SPA entry
-      let assetPath = url.pathname;
-      if (assetPath === "/admin") assetPath = "/admin/index.html";
-      // All static assets are now under /admin/
-      const assetRequest = new Request(new URL(assetPath, request.url), request);
-      return await env.__STATIC_CONTENT.fetch(assetRequest);
+      return await env.ASSETS.fetch(request);
     }
 
     // Handle admin API (POST/GET as needed)
