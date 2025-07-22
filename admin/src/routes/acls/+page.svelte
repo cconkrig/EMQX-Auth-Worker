@@ -1,8 +1,5 @@
-<script lang="ts">
-</script>
-
-<div class="dashboard-title">Welcome to the Admin Dashboard</div>
-<p class="dashboard-desc">Use the sidebar to manage users and ACLs for your EMQX instance.</p>
+<div class="dashboard-title">ACL Management</div>
+<p class="dashboard-desc">Select a user in the Users tab to manage their ACLs.</p>
 
 <style>
 .dashboard-title {
@@ -17,4 +14,4 @@
 	color: #a3a3a3;
 	margin-bottom: 2rem;
 }
-</style>
+</style> 
