@@ -1,0 +1,1 @@
+import"../chunks/DsnmJJEf.js";import"../chunks/BU7QDXSo.js";import{m,a as t}from"../chunks/CkbZnpdq.js";var a=m("<h1>Hello World from Svelte 5!</h1>");function n(o){var r=a();t(o,r)}export{n as component};

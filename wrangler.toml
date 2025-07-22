@@ -12,6 +12,9 @@ preview_urls = false
 binding = "USERS"
 id = "$EMQX_KV_NAMESPACE_ID"
 
-[observability.logs]
+[site]
+bucket = "./public"
+
+[observability]
 enabled = true
 head_sampling_rate = 1
