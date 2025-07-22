@@ -24,6 +24,12 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Build Svelte Admin App
+        run: |
+          cd admin
+          npm install
+          npm run build
+
       - name: Install Wrangler
         run: npm install -g wrangler
 
