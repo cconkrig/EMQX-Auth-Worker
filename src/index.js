@@ -1,6 +1,5 @@
 import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from 'jose';
-import { getAssetFromKV } from '@cloudflare/kv-asset-handler';
 
 // CORS and security headers
 const corsHeaders = {
@@ -90,26 +89,6 @@ function validateTopic(topic) {
     topic.length <= 256 &&
     /^[^\u0000-\u001F\u007F]+$/.test(topic)
   );
-}
-
-async function serveStatic(request, env) {
-  // Serve files from static/ for /admin and /admin/*
-  const url = new URL(request.url);
-  let filePath = url.pathname.replace(/^\/admin/, "");
-  if (!filePath || filePath === "/") filePath = "/index.html";
-  try {
-    const file = await env.ASSETS.get(filePath.slice(1), { type: "arrayBuffer" });
-    if (!file) return new Response("Not found", { status: 404 });
-    // Basic content type detection
-    let type = "text/plain";
-    if (filePath.endsWith(".html")) type = "text/html";
-    if (filePath.endsWith(".js")) type = "application/javascript";
-    if (filePath.endsWith(".css")) type = "text/css";
-    if (filePath.endsWith(".json")) type = "application/json";
-    return new Response(file, { status: 200, headers: { "Content-Type": type } });
-  } catch {
-    return new Response("Not found", { status: 404 });
-  }
 }
 
 function getJwtFromRequest(request) {
@@ -301,9 +280,8 @@ export default {
         const userKey = `user:${username}`;
         const userRaw = await env.USERS.get(userKey);
         if (!userRaw) {
-          log("Auth failed for", username);
-          incrementRateLimit(ip);
-          return jsonResponse({ result: "deny" }, 200);
+          log("Auth user not found, returning ignore for EMQX fallback");
+          return jsonResponse({ result: "ignore" }, 200);
         }
 
         let user;
@@ -326,8 +304,9 @@ export default {
         log("Password check for", username, ok ? "OK" : "FAIL");
         if (!ok) {
           incrementRateLimit(ip);
+          return jsonResponse({ result: "deny" }, 200);
         }
-        return jsonResponse({ result: ok ? "allow" : "deny" }, 200);
+        return jsonResponse({ result: "allow" }, 200);
       }
 
       if (url.pathname === "/acl" && request.method === "POST") {
