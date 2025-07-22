@@ -52,7 +52,7 @@ jobs:
 
       - name: Set JWT_SECRET for Worker
         run: |
-          echo "$(openssl rand -hex 32)" | wrangler secret put JWT_SECRET --yes
+          echo "$(openssl rand -hex 32)" | wrangler secret put JWT_SECRET
 
       - name: Publish to Cloudflare Workers
         env:
