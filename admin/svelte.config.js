@@ -16,7 +16,10 @@ const config = {
 			assets: '../public/admin',
 			fallback: 'index.html',
 			precompress: false
-		})
+		}),
+		paths: {
+			base: '/admin'
+		}
 	}
 };
 
