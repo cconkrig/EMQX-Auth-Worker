@@ -251,7 +251,7 @@ export default {
       if (assetPath === "/admin") assetPath = "/admin/index.html";
       // All static assets are now under /admin/
       const assetRequest = new Request(new URL(assetPath, request.url), request);
-      return await env.ASSETS.fetch(assetRequest);
+      return await env.__STATIC_CONTENT.fetch(assetRequest);
     }
 
     // Handle admin API (POST/GET as needed)
