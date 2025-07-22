@@ -113,24 +113,36 @@ async function requireAdmin(request, env) {
 async function handleAdminApi(request, env) {
   const url = new URL(request.url);
 
-  // Bootstrap endpoint: create first admin if none exist
-  if (url.pathname === "/admin/api/bootstrap-admin" && request.method === "POST") {
-    // Only allow if no admin users exist
-    const existing = await env.USERS.list({ prefix: "admin:" });
-    if (existing.keys.length > 0) {
-      return jsonResponse({ error: "Admin already exists" }, 403);
-    }
-    const { username, password } = await request.json();
-    if (!validateUsername(username) || !validatePassword(password)) {
-      return jsonResponse({ error: "Invalid username or password" }, 400);
-    }
-    const hash = await bcrypt.hash(password, 12);
-    const adminObj = { password_hash: hash, roles: ["admin"] };
-    await env.USERS.put(`admin:${username}`, JSON.stringify(adminObj));
-    return jsonResponse({ success: true });
-  }
+  // Remove bootstrap endpoint
 
   // All other endpoints require admin JWT
+  if (url.pathname.endsWith("/admin/api/login") && request.method === "POST") {
+    const { username, password } = await request.json();
+    if (!username || !password) {
+      return jsonResponse({ error: "Missing credentials" }, 400);
+    }
+    const adminRaw = await env.USERS.get(`admin:${username}`);
+    if (!adminRaw) {
+      return jsonResponse({ error: "Invalid credentials" }, 401);
+    }
+    let admin;
+    try {
+      admin = JSON.parse(adminRaw);
+    } catch {
+      return jsonResponse({ error: "Corrupt admin data" }, 500);
+    }
+    const ok = await bcrypt.compare(password, admin.password_hash);
+    if (!ok) {
+      return jsonResponse({ error: "Invalid credentials" }, 401);
+    }
+    const secret = new TextEncoder().encode(env.JWT_SECRET);
+    const token = await new SignJWT({ username, roles: admin.roles || [] })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setExpirationTime('1h')
+      .sign(secret);
+    return jsonResponse({ token });
+  }
+
   const admin = await requireAdmin(request, env);
   if (!admin) return jsonResponse({ error: "Unauthorized" }, 401);
 
@@ -200,37 +212,6 @@ async function handleAdminApi(request, env) {
     } catch (e) {
       return jsonResponse({ error: e.message || 'Error fetching user details' }, 500);
     }
-  }
-  if (url.pathname === "/admin/api/login" && request.method === "POST") {
-    const { username, password } = await request.json();
-    console.log("Login attempt:", username);
-    if (!username || !password) {
-      console.log("Missing credentials");
-      return jsonResponse({ error: "Missing credentials" }, 400);
-    }
-    const adminRaw = await env.USERS.get(`admin:${username}`);
-    if (!adminRaw) {
-      console.log("Admin not found:", username);
-      return jsonResponse({ error: "Invalid credentials" }, 401);
-    }
-    let admin;
-    try {
-      admin = JSON.parse(adminRaw);
-    } catch {
-      console.log("Corrupt admin data for:", username);
-      return jsonResponse({ error: "Corrupt admin data" }, 500);
-    }
-    const ok = await bcrypt.compare(password, admin.password_hash);
-    console.log("Password match:", ok);
-    if (!ok) {
-      return jsonResponse({ error: "Invalid credentials" }, 401);
-    }
-    const secret = new TextEncoder().encode(env.JWT_SECRET);
-    const token = await new SignJWT({ username, roles: admin.roles || [] })
-      .setProtectedHeader({ alg: 'HS256' })
-      .setExpirationTime('1h')
-      .sign(secret);
-    return jsonResponse({ token });
   }
   return new Response("Not found", { status: 404 });
 }
