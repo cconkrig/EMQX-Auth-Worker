@@ -270,8 +270,11 @@ export default {
       return new Response("Method Not Allowed", { status: 405, headers: corsHeaders });
     }
 
-    // Require Bearer token for POST
-    if (request.method === "POST") {
+    // Require Bearer token for POST, except for /admin/api routes
+    if (
+      request.method === "POST" &&
+      !url.pathname.startsWith("/admin/api")
+    ) {
       const authHeader = request.headers.get("Authorization") || "";
       const expected = `Bearer ${env.API_KEY}`;
       if (!env.API_KEY || authHeader !== expected) {
