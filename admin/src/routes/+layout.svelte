@@ -67,6 +67,12 @@ function logout() {
 		<div class="loading-spinner"></div>
 		<p>Loading layout...</p>
 	</div>
+{:else if window.location.pathname === '/admin/login'}
+	<!-- Login page - render without authentication check -->
+	<div style="background: purple; color: white; padding: 10px; margin: 10px;">
+		DEBUG: Layout rendering login page - Mounted: {mounted}, Path: {window.location.pathname}
+	</div>
+	<slot />
 {:else if isLoading}
 	<div class="loading-container">
 		<div style="background: yellow; color: black; padding: 10px; margin: 10px;">
