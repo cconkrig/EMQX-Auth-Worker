@@ -265,6 +265,11 @@ export default {
     // Cleanup rate limiter map
     cleanupRateLimitMap();
 
+    // Handle admin API (POST/GET as needed) - must come before static file handling
+    if (url.pathname.startsWith("/admin/api")) {
+      return await handleAdminApi(request, env);
+    }
+
     // Serve static admin UI for GET requests to /admin and /admin/* using ASSETS binding
     if (
       (url.pathname === "/admin" || url.pathname.startsWith("/admin/")) &&
@@ -300,11 +305,6 @@ export default {
         statusText: response.statusText,
         headers: newHeaders,
       });
-    }
-
-    // Handle admin API (POST/GET as needed)
-    if (url.pathname.startsWith("/admin/api")) {
-      return await handleAdminApi(request, env);
     }
 
     // Handle CORS preflight
