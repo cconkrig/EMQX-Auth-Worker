@@ -25,6 +25,14 @@ let saveProgress = {
 	maxRetries: 5
 };
 
+// Delete progress state
+let deleteProgress = {
+	active: false,
+	message: '',
+	retryCount: 0,
+	maxRetries: 5
+};
+
 function getToken() {
 	return localStorage.getItem('admin_token');
 }
@@ -210,8 +218,45 @@ async function saveUser() {
 					throw new Error(`Failed to update user: ${res.status} ${errorText}`);
 				}
 				
-				// For edit mode, just reload once
-				await loadUsers();
+				console.log('User updated successfully');
+				
+				// For edit mode, implement retry mechanism to check if username change is reflected
+				const retryDelay = 5000; // 5 seconds as requested
+				const originalUsername = selectedUser;
+				const newUsername = formData.username;
+				const usernameChanged = originalUsername !== newUsername;
+				
+				while (saveProgress.retryCount < saveProgress.maxRetries) {
+					saveProgress.retryCount++;
+					saveProgress.message = `Updating user... this may take a moment while it propagates to the network... (Attempt ${saveProgress.retryCount}/${saveProgress.maxRetries})`;
+					
+					console.log(`Retry ${saveProgress.retryCount}/${saveProgress.maxRetries} - waiting ${retryDelay}ms...`);
+					await new Promise(resolve => setTimeout(resolve, retryDelay));
+					await loadUsers();
+					
+					// Check if the update was successful
+					if (usernameChanged) {
+						// If username changed, check if new username exists and old one doesn't
+						if (users.includes(newUsername) && !users.includes(originalUsername)) {
+							console.log('Username change confirmed in list');
+							break;
+						}
+					} else {
+						// If username didn't change, just check if user still exists
+						if (users.includes(originalUsername)) {
+							console.log('User update confirmed in list');
+							break;
+						}
+					}
+				}
+				
+				if (usernameChanged && (!users.includes(newUsername) || users.includes(originalUsername))) {
+					console.warn('Username change not fully reflected after all retries, but operation was successful');
+				} else if (!usernameChanged && !users.includes(originalUsername)) {
+					console.warn('User not found after update, but operation was successful');
+				} else {
+					console.log('User update confirmed after retry');
+				}
 			}
 			
 			cancelForm();
@@ -232,45 +277,80 @@ function confirmDeleteUser(user: string) {
 async function deleteUser() {
 	if (!userToDelete) return;
 	
+	// Start delete progress
+	deleteProgress = {
+		active: true,
+		message: 'Deleting user... this may take a moment while it propagates to the network...',
+		retryCount: 0,
+		maxRetries: 5
+	};
 	dashboardError = '';
-	dashboardLoading = true;
 	
-	try {
-		const token = getToken();
-		if (!token) {
-			throw new Error('No authentication token found');
+	// Run the delete operation in the background
+	setTimeout(async () => {
+		try {
+			const token = getToken();
+			if (!token) {
+				throw new Error('No authentication token found');
+			}
+			
+			// Reset session timeout for API activity
+			if (typeof window !== 'undefined' && (window as any).resetSessionTimeout) {
+				(window as any).resetSessionTimeout();
+			}
+			
+			console.log('Deleting user:', userToDelete);
+			const res = await fetch('/admin/api/user', {
+				method: 'DELETE',
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${token}`
+				},
+				body: JSON.stringify({ username: userToDelete })
+			});
+			
+			if (!res.ok) {
+				const errorText = await res.text();
+				throw new Error(`Failed to delete user: ${res.status} ${errorText}`);
+			}
+			
+			console.log('User deleted successfully');
+			
+			// Implement retry mechanism to confirm user is removed from list
+			const retryDelay = 5000; // 5 seconds as requested
+			
+			while (deleteProgress.retryCount < deleteProgress.maxRetries && users.includes(userToDelete!)) {
+				deleteProgress.retryCount++;
+				deleteProgress.message = `Deleting user... this may take a moment while it propagates to the network... (Attempt ${deleteProgress.retryCount}/${deleteProgress.maxRetries})`;
+				
+				console.log(`Retry ${deleteProgress.retryCount}/${deleteProgress.maxRetries} - waiting ${retryDelay}ms...`);
+				await new Promise(resolve => setTimeout(resolve, retryDelay));
+				await loadUsers();
+			}
+			
+			if (users.includes(userToDelete!)) {
+				console.warn('User still found in list after all retries, but operation was successful');
+			} else {
+				console.log('User confirmed removed from list after retry');
+			}
+			
+			// Clean up selection if deleted user was selected
+			if (selectedUser === userToDelete) {
+				selectedUser = null;
+				formMode = 'none';
+				formEnabled = false;
+				clearForm();
+			}
+			
+		} catch (e: any) {
+			console.error('Delete user error:', e);
+			dashboardError = e.message || 'Failed to delete user';
+		} finally {
+			deleteProgress.active = false;
+			showDeleteConfirm = false;
+			userToDelete = null;
 		}
-		
-		// Reset session timeout for API activity
-		if (typeof window !== 'undefined' && (window as any).resetSessionTimeout) {
-			(window as any).resetSessionTimeout();
-		}
-		
-		const res = await fetch('/admin/api/user', {
-			method: 'DELETE',
-			headers: {
-				'Content-Type': 'application/json',
-				Authorization: `Bearer ${token}`
-			},
-			body: JSON.stringify({ username: userToDelete })
-		});
-		
-		if (!res.ok) throw new Error('Failed to delete user');
-		
-		await loadUsers();
-		if (selectedUser === userToDelete) {
-			selectedUser = null;
-			formMode = 'none';
-			formEnabled = false;
-			clearForm();
-		}
-	} catch (e: any) {
-		dashboardError = e.message || 'Failed to delete user';
-	} finally {
-		dashboardLoading = false;
-		showDeleteConfirm = false;
-		userToDelete = null;
-	}
+	}, 0);
 }
 
 function cancelDelete() {
@@ -315,21 +395,21 @@ function cancelDelete() {
 			<button 
 				class="action-btn add-btn" 
 				on:click={enableAddMode}
-				disabled={formMode !== 'none'}
+				disabled={formMode !== 'none' || saveProgress.active || deleteProgress.active}
 			>
 				Add
 			</button>
 			<button 
 				class="action-btn edit-btn" 
 				on:click={enableEditMode}
-				disabled={!selectedUser || formMode !== 'none'}
+				disabled={!selectedUser || formMode !== 'none' || saveProgress.active || deleteProgress.active}
 			>
 				Edit
 			</button>
 			<button 
 				class="action-btn delete-btn" 
 				on:click={() => confirmDeleteUser(selectedUser!)}
-				disabled={!selectedUser || formMode !== 'none'}
+				disabled={!selectedUser || formMode !== 'none' || saveProgress.active || deleteProgress.active}
 			>
 				Delete
 			</button>
@@ -359,7 +439,17 @@ function cancelDelete() {
 				</div>
 			{/if}
 			
-			<div class="form-content" class:disabled={saveProgress.active}>
+			<!-- Delete Progress Display -->
+			{#if deleteProgress.active}
+				<div class="delete-progress">
+					<div class="progress-message">
+						<div class="loader-spinner"></div>
+						{deleteProgress.message}
+					</div>
+				</div>
+			{/if}
+			
+			<div class="form-content" class:disabled={saveProgress.active || deleteProgress.active}>
 				{#if formMode === 'none'}
 					<div class="form-placeholder">
 						Select a user from the list or click "Add" to create a new user.
@@ -371,7 +461,7 @@ function cancelDelete() {
 							id="username"
 							type="text" 
 							bind:value={formData.username}
-							disabled={!formEnabled || saveProgress.active}
+							disabled={!formEnabled || saveProgress.active || deleteProgress.active}
 							placeholder="Enter username"
 						/>
 					</div>
@@ -382,7 +472,7 @@ function cancelDelete() {
 							id="password"
 							type="password" 
 							bind:value={formData.password}
-							disabled={!formEnabled || saveProgress.active}
+							disabled={!formEnabled || saveProgress.active || deleteProgress.active}
 							placeholder="Enter password"
 						/>
 					</div>
@@ -391,14 +481,14 @@ function cancelDelete() {
 						<button 
 							class="form-btn save-btn" 
 							on:click={saveUser}
-							disabled={!formEnabled || saveProgress.active}
+							disabled={!formEnabled || saveProgress.active || deleteProgress.active}
 						>
 							Save
 						</button>
 						<button 
 							class="form-btn cancel-btn" 
 							on:click={cancelForm}
-							disabled={!formEnabled || saveProgress.active}
+							disabled={!formEnabled || saveProgress.active || deleteProgress.active}
 						>
 							Cancel
 						</button>
@@ -417,11 +507,20 @@ function cancelDelete() {
 			<div class="modal-body">
 				<p>Are you sure you want to delete user <strong>{userToDelete}</strong>?</p>
 				<p class="warning-text">⚠️ This will also remove all ACLs associated with this user.</p>
+				
+				{#if deleteProgress.active}
+					<div class="modal-progress">
+						<div class="progress-message">
+							<div class="loader-spinner"></div>
+							{deleteProgress.message}
+						</div>
+					</div>
+				{/if}
 			</div>
 			<div class="modal-actions">
-				<button class="modal-btn cancel-btn" on:click={cancelDelete}>Cancel</button>
-				<button class="modal-btn delete-btn" on:click={deleteUser} disabled={dashboardLoading}>
-					{dashboardLoading ? 'Deleting...' : 'Delete'}
+				<button class="modal-btn cancel-btn" on:click={cancelDelete} disabled={deleteProgress.active}>Cancel</button>
+				<button class="modal-btn delete-btn" on:click={deleteUser} disabled={deleteProgress.active}>
+					{deleteProgress.active ? 'Deleting...' : 'Delete'}
 				</button>
 			</div>
 		</div>
@@ -778,6 +877,32 @@ function cancelDelete() {
 	100% { transform: rotate(360deg); }
 }
 
+/* Delete Progress styles */
+.delete-progress {
+	background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
+	border-radius: 0.8rem;
+	padding: 1rem;
+	margin-bottom: 1rem;
+	border: 1px solid #ef4444;
+}
+
+.delete-progress .progress-message {
+	color: white;
+}
+
+/* Modal Progress styles */
+.modal-progress {
+	background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+	border-radius: 0.8rem;
+	padding: 1rem;
+	margin-bottom: 1rem;
+	border: 1px solid #60a5fa;
+}
+
+.modal-progress .progress-message {
+	color: white;
+}
+
 /* Disabled form content */
 .form-content.disabled {
 	opacity: 0.6;
@@ -787,6 +912,13 @@ function cancelDelete() {
 .form-content.disabled .form-field input,
 .form-content.disabled .form-actions button {
 	cursor: not-allowed;
+}
+
+/* Disabled action buttons */
+.action-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+	transform: none !important;
 }
 
 /* Responsive design */
