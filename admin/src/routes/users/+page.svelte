@@ -17,6 +17,14 @@ let formEnabled = false;
 let showDeleteConfirm = false;
 let userToDelete: string | null = null;
 
+// Save progress state
+let saveProgress = {
+	active: false,
+	message: '',
+	retryCount: 0,
+	maxRetries: 5
+};
+
 function getToken() {
 	return localStorage.getItem('admin_token');
 }
@@ -120,92 +128,100 @@ async function saveUser() {
 		return;
 	}
 	
-	dashboardLoading = true;
+	// Start save progress
+	saveProgress = {
+		active: true,
+		message: 'Saving user... this may take a moment while it propagates to the network...',
+		retryCount: 0,
+		maxRetries: 5
+	};
 	dashboardError = '';
 	
-	try {
-		const token = getToken();
-		if (!token) {
-			throw new Error('No authentication token found');
-		}
-		
-		// Reset session timeout for API activity
-		if (typeof window !== 'undefined' && (window as any).resetSessionTimeout) {
-			(window as any).resetSessionTimeout();
-		}
-		
-		if (formMode === 'add') {
-			// Add new user
-			console.log('Adding user:', formData.username);
-			const res = await fetch('/admin/api/user', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					Authorization: `Bearer ${token}`
-				},
-				body: JSON.stringify({
-					username: formData.username,
-					password: formData.password,
-					acls: []
-				})
-			});
-			
-			if (!res.ok) {
-				const errorText = await res.text();
-				throw new Error(`Failed to add user: ${res.status} ${errorText}`);
+	// Run the save operation in the background
+	setTimeout(async () => {
+		try {
+			const token = getToken();
+			if (!token) {
+				throw new Error('No authentication token found');
 			}
 			
-			console.log('User added successfully');
-		} else if (formMode === 'edit' && selectedUser) {
-			// Update existing user
-			const res = await fetch('/admin/api/user', {
-				method: 'PUT',
-				headers: {
-					'Content-Type': 'application/json',
-					Authorization: `Bearer ${token}`
-				},
-				body: JSON.stringify({
-					username: selectedUser,
-					newUsername: formData.username,
-					password: formData.password
-				})
-			});
-			
-			if (!res.ok) {
-				const errorText = await res.text();
-				throw new Error(`Failed to update user: ${res.status} ${errorText}`);
+			// Reset session timeout for API activity
+			if (typeof window !== 'undefined' && (window as any).resetSessionTimeout) {
+				(window as any).resetSessionTimeout();
 			}
-		}
-		
-		// For add mode, implement a more robust retry mechanism
-		if (formMode === 'add') {
-			let retryCount = 0;
-			const maxRetries = 5;
-			const retryDelay = 1000;
 			
-			while (retryCount < maxRetries && !users.includes(formData.username)) {
-				console.log(`Retry ${retryCount + 1}/${maxRetries} - waiting ${retryDelay}ms...`);
-				await new Promise(resolve => setTimeout(resolve, retryDelay));
+			if (formMode === 'add') {
+				// Add new user
+				console.log('Adding user:', formData.username);
+				const res = await fetch('/admin/api/user', {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+						Authorization: `Bearer ${token}`
+					},
+					body: JSON.stringify({
+						username: formData.username,
+						password: formData.password,
+						acls: []
+					})
+				});
+				
+				if (!res.ok) {
+					const errorText = await res.text();
+					throw new Error(`Failed to add user: ${res.status} ${errorText}`);
+				}
+				
+				console.log('User added successfully');
+				
+				// For add mode, implement a more robust retry mechanism
+				const retryDelay = 5000; // 5 seconds as requested
+				
+				while (saveProgress.retryCount < saveProgress.maxRetries && !users.includes(formData.username)) {
+					saveProgress.retryCount++;
+					saveProgress.message = `Saving user... this may take a moment while it propagates to the network... (Attempt ${saveProgress.retryCount}/${saveProgress.maxRetries})`;
+					
+					console.log(`Retry ${saveProgress.retryCount}/${saveProgress.maxRetries} - waiting ${retryDelay}ms...`);
+					await new Promise(resolve => setTimeout(resolve, retryDelay));
+					await loadUsers();
+				}
+				
+				if (!users.includes(formData.username)) {
+					console.warn('User still not found after all retries, but operation was successful');
+				} else {
+					console.log('User found in list after retry');
+				}
+			} else if (formMode === 'edit' && selectedUser) {
+				// Update existing user
+				const res = await fetch('/admin/api/user', {
+					method: 'PUT',
+					headers: {
+						'Content-Type': 'application/json',
+						Authorization: `Bearer ${token}`
+					},
+					body: JSON.stringify({
+						username: selectedUser,
+						newUsername: formData.username,
+						password: formData.password
+					})
+				});
+				
+				if (!res.ok) {
+					const errorText = await res.text();
+					throw new Error(`Failed to update user: ${res.status} ${errorText}`);
+				}
+				
+				// For edit mode, just reload once
 				await loadUsers();
-				retryCount++;
 			}
 			
-			if (!users.includes(formData.username)) {
-				console.warn('User still not found after all retries, but operation was successful');
-			} else {
-				console.log('User found in list after retry');
-			}
-		} else {
-			// For edit mode, just reload once
-			await loadUsers();
+			cancelForm();
+		} catch (e: any) {
+			console.error('Save user error:', e);
+			dashboardError = e.message || 'Failed to save user';
+		} finally {
+			saveProgress.active = false;
 		}
-		cancelForm();
-	} catch (e: any) {
-		console.error('Save user error:', e);
-		dashboardError = e.message || 'Failed to save user';
-	} finally {
-		dashboardLoading = false;
-	}
+	}, 0);
 }
 
 function confirmDeleteUser(user: string) {
@@ -333,7 +349,17 @@ function cancelDelete() {
 				{/if}
 			</div>
 			
-			<div class="form-content">
+			<!-- Save Progress Display -->
+			{#if saveProgress.active}
+				<div class="save-progress">
+					<div class="progress-message">
+						<div class="loader-spinner"></div>
+						{saveProgress.message}
+					</div>
+				</div>
+			{/if}
+			
+			<div class="form-content" class:disabled={saveProgress.active}>
 				{#if formMode === 'none'}
 					<div class="form-placeholder">
 						Select a user from the list or click "Add" to create a new user.
@@ -345,7 +371,7 @@ function cancelDelete() {
 							id="username"
 							type="text" 
 							bind:value={formData.username}
-							disabled={!formEnabled}
+							disabled={!formEnabled || saveProgress.active}
 							placeholder="Enter username"
 						/>
 					</div>
@@ -356,7 +382,7 @@ function cancelDelete() {
 							id="password"
 							type="password" 
 							bind:value={formData.password}
-							disabled={!formEnabled}
+							disabled={!formEnabled || saveProgress.active}
 							placeholder="Enter password"
 						/>
 					</div>
@@ -365,14 +391,14 @@ function cancelDelete() {
 						<button 
 							class="form-btn save-btn" 
 							on:click={saveUser}
-							disabled={!formEnabled || dashboardLoading}
+							disabled={!formEnabled || saveProgress.active}
 						>
 							Save
 						</button>
 						<button 
 							class="form-btn cancel-btn" 
 							on:click={cancelForm}
-							disabled={!formEnabled || dashboardLoading}
+							disabled={!formEnabled || saveProgress.active}
 						>
 							Cancel
 						</button>
@@ -716,6 +742,50 @@ function cancelDelete() {
 
 .modal-btn:disabled {
 	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+/* Save Progress styles */
+.save-progress {
+	background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+	border-radius: 0.8rem;
+	padding: 1rem;
+	margin-bottom: 1rem;
+	border: 1px solid #60a5fa;
+}
+
+.progress-message {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	color: white;
+	font-size: 0.95rem;
+	font-weight: 500;
+}
+
+.loader-spinner {
+	width: 20px;
+	height: 20px;
+	border: 2px solid rgba(255, 255, 255, 0.3);
+	border-top: 2px solid white;
+	border-radius: 50%;
+	animation: spin 1s linear infinite;
+	flex-shrink: 0;
+}
+
+@keyframes spin {
+	0% { transform: rotate(0deg); }
+	100% { transform: rotate(360deg); }
+}
+
+/* Disabled form content */
+.form-content.disabled {
+	opacity: 0.6;
+	pointer-events: none;
+}
+
+.form-content.disabled .form-field input,
+.form-content.disabled .form-actions button {
 	cursor: not-allowed;
 }
 
