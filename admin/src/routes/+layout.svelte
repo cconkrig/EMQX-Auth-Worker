@@ -1,11 +1,20 @@
 <script lang="ts">
 import { page } from '$app/stores';
-import { onMount } from 'svelte';
+import { onMount, onDestroy } from 'svelte';
 import { goto } from '$app/navigation';
 
 let isAuthenticated = false;
 let isLoading = true;
 let mounted = false;
+
+// Session timeout management
+let sessionTimeoutId: number | null = null;
+const SESSION_TIMEOUT = 15 * 60 * 1000; // 15 minutes in milliseconds
+
+// Expose resetSessionTimeout function globally for child components
+if (typeof window !== 'undefined') {
+	(window as any).resetSessionTimeout = resetSessionTimeout;
+}
 
 // Reactive statement to handle authentication when pathname changes
 $: if (mounted && $page.url.pathname !== '/admin/login') {
@@ -23,7 +32,77 @@ onMount(() => {
 	
 	// Check authentication for initial load
 	checkAuthentication();
+	
+	// Set up activity tracking for session timeout
+	setupSessionTimeout();
 });
+
+onDestroy(() => {
+	// Clean up timeout when component is destroyed
+	if (sessionTimeoutId) {
+		clearTimeout(sessionTimeoutId);
+	}
+	
+	// Remove event listeners
+	removeActivityListeners();
+	
+	// Clean up global function
+	if (typeof window !== 'undefined') {
+		delete (window as any).resetSessionTimeout;
+	}
+});
+
+function setupSessionTimeout() {
+	// Reset the session timeout
+	resetSessionTimeout();
+	
+	// Add event listeners for user activity
+	addActivityListeners();
+}
+
+function resetSessionTimeout() {
+	// Clear existing timeout
+	if (sessionTimeoutId) {
+		clearTimeout(sessionTimeoutId);
+	}
+	
+	// Set new timeout
+	sessionTimeoutId = setTimeout(() => {
+		console.log('Session expired due to inactivity');
+		logout('Session expired due to inactivity');
+	}, SESSION_TIMEOUT);
+}
+
+function addActivityListeners() {
+	// Track various user activities
+	const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+	
+	events.forEach(event => {
+		document.addEventListener(event, resetSessionTimeout, true);
+	});
+	
+	// Track page visibility changes
+	document.addEventListener('visibilitychange', () => {
+		if (!document.hidden) {
+			resetSessionTimeout();
+		}
+	});
+}
+
+function removeActivityListeners() {
+	// Remove all activity event listeners
+	const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+	
+	events.forEach(event => {
+		document.removeEventListener(event, resetSessionTimeout, true);
+	});
+	
+	document.removeEventListener('visibilitychange', () => {
+		if (!document.hidden) {
+			resetSessionTimeout();
+		}
+	});
+}
 
 function checkAuthentication() {
 	const token = localStorage.getItem('admin_token');
@@ -48,6 +127,8 @@ function checkAuthentication() {
 		clearTimeout(timeoutId);
 		if (res.ok) {
 			isAuthenticated = true;
+			// Reset session timeout when authentication is successful
+			resetSessionTimeout();
 		} else {
 			localStorage.removeItem('admin_token');
 			goto('/admin/login');
@@ -61,8 +142,24 @@ function checkAuthentication() {
 	});
 }
 
-function logout() {
+function logout(reason = 'User logged out') {
+	// Clean up session timeout
+	if (sessionTimeoutId) {
+		clearTimeout(sessionTimeoutId);
+		sessionTimeoutId = null;
+	}
+	
+	// Remove activity listeners
+	removeActivityListeners();
+	
+	// Clear token and redirect
 	localStorage.removeItem('admin_token');
+	
+	// Show logout reason if it's due to timeout
+	if (reason.includes('Session expired')) {
+		alert('You have been logged out due to inactivity. Please log in again.');
+	}
+	
 	goto('/admin/login');
 }
 </script>
@@ -88,7 +185,7 @@ function logout() {
 				<li><a href="/admin/" class:active={$page.url.pathname === '/admin/'}>Dashboard</a></li>
 				<li><a href="/admin/users" class:active={$page.url.pathname === '/admin/users'}>Users</a></li>
 				<li><a href="/admin/acls" class:active={$page.url.pathname === '/admin/acls'}>ACLs</a></li>
-				<li><button type="button" class="logout-link" on:click={logout}>Logout</button></li>
+				<li><button type="button" class="logout-link" on:click={() => logout()}>Logout</button></li>
 			</ul>
 		</nav>
 		<section class="main-content">

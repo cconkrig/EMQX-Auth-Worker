@@ -1,6 +1,5 @@
 <script lang="ts">
 import { onMount } from 'svelte';
-let token: string | null = null;
 let users: string[] = [];
 let selectedUser: string | null = null;
 let userAcls: any[] = [];
@@ -20,7 +19,6 @@ function getToken() {
 }
 
 onMount(() => {
-	token = getToken();
 	loadUsers();
 });
 
@@ -28,6 +26,16 @@ async function loadUsers() {
 	dashboardLoading = true;
 	dashboardError = '';
 	try {
+		const token = getToken();
+		if (!token) {
+			throw new Error('No authentication token found');
+		}
+		
+		// Reset session timeout for API activity
+		if (typeof window !== 'undefined' && (window as any).resetSessionTimeout) {
+			(window as any).resetSessionTimeout();
+		}
+		
 		const res = await fetch('/admin/api/users', {
 			headers: { Authorization: `Bearer ${token}` }
 		});
@@ -46,6 +54,16 @@ async function selectUser(user: string) {
 	userAcls = [];
 	dashboardError = '';
 	try {
+		const token = getToken();
+		if (!token) {
+			throw new Error('No authentication token found');
+		}
+		
+		// Reset session timeout for API activity
+		if (typeof window !== 'undefined' && (window as any).resetSessionTimeout) {
+			(window as any).resetSessionTimeout();
+		}
+		
 		const res = await fetch(`/admin/api/user-details?username=${encodeURIComponent(user)}`, {
 			headers: { Authorization: `Bearer ${token}` }
 		});
@@ -65,6 +83,16 @@ async function addUser() {
 	}
 	dashboardLoading = true;
 	try {
+		const token = getToken();
+		if (!token) {
+			throw new Error('No authentication token found');
+		}
+		
+		// Reset session timeout for API activity
+		if (typeof window !== 'undefined' && (window as any).resetSessionTimeout) {
+			(window as any).resetSessionTimeout();
+		}
+		
 		const res = await fetch('/admin/api/user', {
 			method: 'POST',
 			headers: {
@@ -91,6 +119,16 @@ async function deleteUser(user: string) {
 	dashboardError = '';
 	dashboardLoading = true;
 	try {
+		const token = getToken();
+		if (!token) {
+			throw new Error('No authentication token found');
+		}
+		
+		// Reset session timeout for API activity
+		if (typeof window !== 'undefined' && (window as any).resetSessionTimeout) {
+			(window as any).resetSessionTimeout();
+		}
+		
 		const res = await fetch('/admin/api/user', {
 			method: 'DELETE',
 			headers: {
@@ -113,6 +151,16 @@ async function updateAcls() {
 	dashboardError = '';
 	dashboardLoading = true;
 	try {
+		const token = getToken();
+		if (!token) {
+			throw new Error('No authentication token found');
+		}
+		
+		// Reset session timeout for API activity
+		if (typeof window !== 'undefined' && (window as any).resetSessionTimeout) {
+			(window as any).resetSessionTimeout();
+		}
+		
 		const res = await fetch('/admin/api/acl', {
 			method: 'POST',
 			headers: {
