@@ -7,6 +7,12 @@ let isAuthenticated = false;
 let isLoading = true;
 let mounted = false;
 
+// Reactive statement to handle authentication when pathname changes
+$: if (mounted && $page.url.pathname !== '/admin/login') {
+	console.log('Pathname changed to:', $page.url.pathname, '- checking authentication');
+	checkAuthentication();
+}
+
 onMount(() => {
 	console.log('Layout mounted, pathname:', $page.url.pathname);
 	mounted = true;
@@ -18,6 +24,11 @@ onMount(() => {
 		return;
 	}
 	
+	// Check authentication for initial load
+	checkAuthentication();
+});
+
+function checkAuthentication() {
 	const token = localStorage.getItem('admin_token');
 	console.log('Token found in localStorage:', token ? 'YES' : 'NO');
 	
@@ -26,6 +37,10 @@ onMount(() => {
 		goto('/admin/login');
 		return;
 	}
+	
+	// Reset state for new check
+	isLoading = true;
+	isAuthenticated = false;
 	
 	// Verify token is still valid by making a test request
 	const controller = new AbortController();
@@ -56,7 +71,7 @@ onMount(() => {
 		console.log('Token verification complete, setting isLoading to false');
 		isLoading = false;
 	});
-});
+}
 
 function logout() {
 	localStorage.removeItem('admin_token');
