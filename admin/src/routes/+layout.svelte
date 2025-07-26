@@ -8,11 +8,11 @@ let isLoading = true;
 let mounted = false;
 
 onMount(() => {
-	console.log('Layout mounted, pathname:', window.location.pathname);
+	console.log('Layout mounted, pathname:', $page.url.pathname);
 	mounted = true;
 	
 	// If we're already on the login page, don't check authentication
-	if (window.location.pathname === '/admin/login') {
+	if ($page.url.pathname === '/admin/login') {
 		console.log('On login page, skipping auth check');
 		isLoading = false;
 		return;
@@ -67,10 +67,10 @@ function logout() {
 		<div class="loading-spinner"></div>
 		<p>Loading layout...</p>
 	</div>
-{:else if window.location.pathname === '/admin/login'}
+{:else if $page.url.pathname === '/admin/login'}
 	<!-- Login page - render without authentication check -->
 	<div style="background: purple; color: white; padding: 10px; margin: 10px;">
-		DEBUG: Layout rendering login page - Mounted: {mounted}, Path: {window.location.pathname}
+		DEBUG: Layout rendering login page - Mounted: {mounted}, Path: {$page.url.pathname}
 	</div>
 	<slot />
 {:else if isLoading}
