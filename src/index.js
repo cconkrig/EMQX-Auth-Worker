@@ -113,7 +113,40 @@ async function requireAdmin(request, env) {
 async function handleAdminApi(request, env) {
   const url = new URL(request.url);
 
-  // Remove bootstrap endpoint
+  // Bootstrap endpoint - creates first admin user if none exists
+  if (url.pathname === "/admin/api/bootstrap" && request.method === "POST") {
+    try {
+      // Check if any admin users exist
+      const adminList = await env.USERS.list({ prefix: "admin:" });
+      if (adminList.keys.length > 0) {
+        return jsonResponse({ error: "Admin user already exists" }, 400);
+      }
+
+      const { username, password } = await request.json();
+      if (!username || !password) {
+        return jsonResponse({ error: "Missing username or password" }, 400);
+      }
+
+      // Validate username and password
+      if (!validateUsername(username) || !validatePassword(password)) {
+        return jsonResponse({ error: "Invalid username or password format" }, 400);
+      }
+
+      // Create admin user
+      const hash = await bcrypt.hash(password, 12);
+      const adminObj = { 
+        password_hash: hash, 
+        roles: ["admin"],
+        created_at: new Date().toISOString()
+      };
+      await env.USERS.put(`admin:${username}`, JSON.stringify(adminObj));
+      
+      console.log(`[BOOTSTRAP] Created first admin user: ${username}`);
+      return jsonResponse({ success: true, message: "Admin user created successfully" });
+    } catch (e) {
+      return jsonResponse({ error: e.message || 'Error creating admin user' }, 500);
+    }
+  }
 
   // All other endpoints require admin JWT
   if (url.pathname.endsWith("/admin/api/login") && request.method === "POST") {

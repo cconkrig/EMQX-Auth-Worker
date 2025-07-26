@@ -1,25 +1,62 @@
 <script lang="ts">
 import { page } from '$app/stores';
+import { onMount } from 'svelte';
+
+let isAuthenticated = false;
+let isLoading = true;
+
+onMount(() => {
+	const token = localStorage.getItem('admin_token');
+	if (!token) {
+		window.location.href = '/admin/login';
+		return;
+	}
+	
+	// Verify token is still valid by making a test request
+	fetch('/admin/api/users', {
+		headers: { Authorization: `Bearer ${token}` }
+	}).then(res => {
+		if (res.ok) {
+			isAuthenticated = true;
+		} else {
+			localStorage.removeItem('admin_token');
+			window.location.href = '/admin/login';
+		}
+	}).catch(() => {
+		localStorage.removeItem('admin_token');
+		window.location.href = '/admin/login';
+	}).finally(() => {
+		isLoading = false;
+	});
+});
+
 function logout() {
 	localStorage.removeItem('admin_token');
-	window.location.href = '/admin/';
+	window.location.href = '/admin/login';
 }
 </script>
 
-<main class="admin-root">
-	<nav class="sidebar">
-		<div class="sidebar-title">EMQX Admin</div>
-		<ul class="sidebar-nav">
-			<li><a href="/admin/" class:active={$page.url.pathname === '/admin/'}>Dashboard</a></li>
-			<li><a href="/admin/users" class:active={$page.url.pathname === '/admin/users'}>Users</a></li>
-			<li><a href="/admin/acls" class:active={$page.url.pathname === '/admin/acls'}>ACLs</a></li>
-			<li class="logout-link" on:click={logout}>Logout</li>
-		</ul>
-	</nav>
-	<section class="main-content">
-		<slot />
-	</section>
-</main>
+{#if isLoading}
+	<div class="loading-container">
+		<div class="loading-spinner"></div>
+		<p>Loading...</p>
+	</div>
+{:else if isAuthenticated}
+	<main class="admin-root">
+		<nav class="sidebar">
+			<div class="sidebar-title">EMQX Admin</div>
+			<ul class="sidebar-nav">
+				<li><a href="/admin/" class:active={$page.url.pathname === '/admin/'}>Dashboard</a></li>
+				<li><a href="/admin/users" class:active={$page.url.pathname === '/admin/users'}>Users</a></li>
+				<li><a href="/admin/acls" class:active={$page.url.pathname === '/admin/acls'}>ACLs</a></li>
+				<li><button type="button" class="logout-link" on:click={logout}>Logout</button></li>
+			</ul>
+		</nav>
+		<section class="main-content">
+			<slot />
+		</section>
+	</main>
+{/if}
 
 <style>
 :global(html) {
@@ -86,6 +123,12 @@ function logout() {
 	text-align: center;
 	font-weight: 700;
 	transition: background 0.18s;
+	border: none;
+	border-radius: 0.6rem;
+	padding: 0.7rem 1rem;
+	font-size: 1.1rem;
+	cursor: pointer;
+	width: 100%;
 }
 .sidebar-nav .logout-link:hover {
 	background: #b91c1c;
@@ -98,5 +141,30 @@ function logout() {
 	gap: 2.5rem;
 	background: transparent;
 	min-height: 100vh;
+}
+
+.loading-container {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	min-height: 100vh;
+	background: linear-gradient(135deg, #23283a 0%, #181c24 100%);
+	color: #e5e7eb;
+}
+
+.loading-spinner {
+	width: 40px;
+	height: 40px;
+	border: 4px solid #374151;
+	border-top: 4px solid #60a5fa;
+	border-radius: 50%;
+	animation: spin 1s linear infinite;
+	margin-bottom: 1rem;
+}
+
+@keyframes spin {
+	0% { transform: rotate(0deg); }
+	100% { transform: rotate(360deg); }
 }
 </style> 

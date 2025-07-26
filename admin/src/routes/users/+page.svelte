@@ -21,7 +21,7 @@ function getToken() {
 
 onMount(() => {
 	token = getToken();
-	if (token) loadUsers();
+	loadUsers();
 });
 
 async function loadUsers() {
@@ -171,7 +171,13 @@ function deleteAclRule(i: number) {
 	<div class="user-list-title">Users:</div>
 	<div class="user-list">
 		{#each users as user}
-			<div class="user-item {selectedUser === user ? 'selected' : ''}" on:click={() => selectUser(user)}>
+			<div 
+				class="user-item {selectedUser === user ? 'selected' : ''}" 
+				on:click={() => selectUser(user)}
+				on:keydown={(e) => e.key === 'Enter' && selectUser(user)}
+				role="button"
+				tabindex="0"
+			>
 				{user}
 				<button class="delete-btn" on:click|stopPropagation={() => deleteUser(user)} title="Delete user">✕</button>
 			</div>

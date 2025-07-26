@@ -20,6 +20,7 @@ This Cloudflare Worker provides HTTP endpoints for EMQX authentication and ACL c
 
 The `/admin` route serves a Svelte-based admin panel for managing users and ACLs.
 - **Login**: JWT-protected login for admin users (credentials stored in KV as `admin:<username>`)
+- **Bootstrap**: First-time setup automatically detects if no admin users exist and provides a setup form
 - **User management**: List, create, update, and delete users
 - **ACL management**: View, add, update, and remove ACLs for each user
 - **Audit logging**: All admin actions are logged to the console for traceability
@@ -100,7 +101,13 @@ This will output the static assets to `static/` for the Worker to serve.
      - Set the Worker secret `JWT_SECRET` for admin JWTs.
      - Deploy the Worker using Wrangler.
 
-6. **Upload users to KV:**
+6. **First-time setup:**
+   - Navigate to `/admin/login` in your browser
+   - If no admin users exist, you'll see a "First-time setup" form
+   - Create your admin account with username and password
+   - Once created, you can log in normally
+
+7. **Upload users to KV (alternative):**
    - Use the Cloudflare dashboard or API to add user records as shown above.
    - To add an admin, store a record as `admin:<username>` with a bcrypt-hashed password and `roles: ["admin"]`.
 
@@ -115,6 +122,7 @@ This will output the static assets to `static/` for the Worker to serve.
 - **Response:** `{ "result": "allow" }` or `{ "result": "deny" }`
 
 ### **Admin API Endpoints**
+- `/admin/api/bootstrap` (POST): Create first admin user (no auth required, only works if no admin users exist)
 - `/admin/api/login` (POST): Admin login, returns JWT
 - `/admin/api/user` (POST): Create/update user (JWT required)
 - `/admin/api/user` (DELETE): Delete user (JWT required)
