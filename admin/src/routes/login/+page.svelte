@@ -8,9 +8,12 @@ let error = '';
 let loading = false;
 let isBootstrapMode = false;
 let bootstrapMessage = '';
+let mounted = false;
 
 onMount(async () => {
 	console.log('Login page mounted');
+	mounted = true;
+	
 	// Check if we're in bootstrap mode (no admin users exist)
 	try {
 		console.log('Making bootstrap API call...');
@@ -85,60 +88,70 @@ async function handleSubmit() {
 }
 </script>
 
-<div class="login-container">
-	<!-- DEBUG: This should be visible if the login page is rendering -->
-	<div style="background: red; color: white; padding: 10px; margin: 10px;">
-		DEBUG: Login page is rendering
-	</div>
-	<div class="login-card">
-		<div class="login-header">
-			<h1>EMQX Admin</h1>
-			{#if isBootstrapMode}
-				<p class="bootstrap-notice">First-time setup: Create your admin account</p>
-			{:else}
-				<p>Sign in to manage users and ACLs</p>
-			{/if}
+{#if mounted}
+	<div class="login-container">
+		<!-- DEBUG: This should be visible if the login page is rendering -->
+		<div style="background: red; color: white; padding: 10px; margin: 10px;">
+			DEBUG: Login page is rendering - Mounted: {mounted}
 		</div>
-
-		{#if bootstrapMessage}
-			<div class="success-message">{bootstrapMessage}</div>
-		{/if}
-
-		{#if error}
-			<div class="error-message">{error}</div>
-		{/if}
-
-		<form on:submit|preventDefault={handleSubmit} class="login-form">
-			<div class="form-group">
-				<label for="username">Username</label>
-				<input
-					id="username"
-					type="text"
-					bind:value={username}
-					required
-					placeholder="Enter username"
-					disabled={loading}
-				/>
+		<div class="login-card">
+			<div class="login-header">
+				<h1>EMQX Admin</h1>
+				{#if isBootstrapMode}
+					<p class="bootstrap-notice">First-time setup: Create your admin account</p>
+				{:else}
+					<p>Sign in to manage users and ACLs</p>
+				{/if}
 			</div>
 
-			<div class="form-group">
-				<label for="password">Password</label>
-				<input
-					id="password"
-					type="password"
-					bind:value={password}
-					required
-					placeholder="Enter password"
-					disabled={loading}
-				/>
-			</div>
+			{#if bootstrapMessage}
+				<div class="success-message">{bootstrapMessage}</div>
+			{/if}
 
-			<button type="submit" disabled={loading} class="login-button">
-				{loading ? 'Processing...' : (isBootstrapMode ? 'Create Admin Account' : 'Sign In')}
-			</button>
-		</form>
+			{#if error}
+				<div class="error-message">{error}</div>
+			{/if}
+
+			<form on:submit|preventDefault={handleSubmit} class="login-form">
+				<div class="form-group">
+					<label for="username">Username</label>
+					<input
+						id="username"
+						type="text"
+						bind:value={username}
+						required
+						placeholder="Enter username"
+						disabled={loading}
+					/>
+				</div>
+
+				<div class="form-group">
+					<label for="password">Password</label>
+					<input
+						id="password"
+						type="password"
+						bind:value={password}
+						required
+						placeholder="Enter password"
+						disabled={loading}
+					/>
+				</div>
+
+				<button type="submit" disabled={loading} class="login-button">
+					{loading ? 'Processing...' : (isBootstrapMode ? 'Create Admin Account' : 'Sign In')}
+				</button>
+			</form>
+		</div>
 	</div>
-</div>
+{:else}
+	<div class="login-container">
+		<div style="background: blue; color: white; padding: 10px; margin: 10px;">
+			DEBUG: Login page is loading - Mounted: {mounted}
+		</div>
+		<div class="loading-spinner"></div>
+		<p>Loading login page...</p>
+	</div>
+{/if}
 
 <style>
 .login-container {

@@ -1,20 +1,24 @@
 <script lang="ts">
+import { onMount } from 'svelte';
+
+let message = 'Hello World';
+let mounted = false;
+
+onMount(() => {
+	console.log('Main page mounted');
+	mounted = true;
+});
 </script>
 
-<div class="dashboard-title">Welcome to the Admin Dashboard</div>
-<p class="dashboard-desc">Use the sidebar to manage users and ACLs for your EMQX instance.</p>
-
-<style>
-.dashboard-title {
-	font-size: 2.3rem;
-	font-weight: 800;
-	color: #e5e7eb;
-	margin-bottom: 0.5rem;
-	letter-spacing: -1px;
-}
-.dashboard-desc {
-	font-size: 1.2rem;
-	color: #a3a3a3;
-	margin-bottom: 2rem;
-}
-</style>
+<div style="background: #23283a; color: white; padding: 20px; min-height: 100vh;">
+	<h1>EMQX Admin Dashboard</h1>
+	<p>Message: {message}</p>
+	<p>Mounted: {mounted}</p>
+	<p>Time: {new Date().toLocaleString()}</p>
+	
+	<div style="background: green; color: white; padding: 10px; margin: 10px;">
+		DEBUG: Main page is rendering - Mounted: {mounted}
+	</div>
+	
+	<a href="/admin/login" style="color: #60a5fa;">Go to Login</a>
+</div>

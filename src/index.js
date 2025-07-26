@@ -270,16 +270,21 @@ export default {
       (url.pathname === "/admin" || url.pathname.startsWith("/admin/")) &&
       request.method === "GET"
     ) {
+      console.log(`[ADMIN] Serving admin UI for path: ${url.pathname}`);
+      
       // For SPA routing, try to serve the specific file first, then fallback to index.html
       let response = await env.ASSETS.fetch(request);
+      console.log(`[ADMIN] Initial response status: ${response.status}`);
       
       // If the file doesn't exist (404), serve index.html for SPA routing
       if (response.status === 404) {
+        console.log(`[ADMIN] File not found, serving index.html for SPA routing`);
         const indexRequest = new Request(new URL('/admin/index.html', request.url), {
           method: 'GET',
           headers: request.headers
         });
         response = await env.ASSETS.fetch(indexRequest);
+        console.log(`[ADMIN] Index.html response status: ${response.status}`);
       }
       
       // Add admin security headers to the response
@@ -287,6 +292,8 @@ export default {
       Object.entries(adminHeaders).forEach(([key, value]) => {
         newHeaders.set(key, value);
       });
+      
+      console.log(`[ADMIN] Final response status: ${response.status}, content-type: ${newHeaders.get('content-type')}`);
       
       return new Response(response.body, {
         status: response.status,

@@ -5,16 +5,22 @@ import { goto } from '$app/navigation';
 
 let isAuthenticated = false;
 let isLoading = true;
+let mounted = false;
 
 onMount(() => {
+	console.log('Layout mounted, pathname:', window.location.pathname);
+	mounted = true;
+	
 	// If we're already on the login page, don't check authentication
 	if (window.location.pathname === '/admin/login') {
+		console.log('On login page, skipping auth check');
 		isLoading = false;
 		return;
 	}
 	
 	const token = localStorage.getItem('admin_token');
 	if (!token) {
+		console.log('No token found, redirecting to login');
 		goto('/admin/login');
 		return;
 	}
@@ -23,19 +29,23 @@ onMount(() => {
 	const controller = new AbortController();
 	const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 	
+	console.log('Verifying token...');
 	fetch('/admin/api/users', {
 		headers: { Authorization: `Bearer ${token}` },
 		signal: controller.signal
 	}).then(res => {
 		clearTimeout(timeoutId);
+		console.log('Token verification response:', res.status);
 		if (res.ok) {
 			isAuthenticated = true;
 		} else {
+			console.log('Token invalid, redirecting to login');
 			localStorage.removeItem('admin_token');
 			goto('/admin/login');
 		}
-	}).catch(() => {
+	}).catch((error) => {
 		clearTimeout(timeoutId);
+		console.log('Token verification error:', error);
 		localStorage.removeItem('admin_token');
 		goto('/admin/login');
 	}).finally(() => {
@@ -49,8 +59,19 @@ function logout() {
 }
 </script>
 
-{#if isLoading}
+{#if !mounted}
 	<div class="loading-container">
+		<div style="background: orange; color: white; padding: 10px; margin: 10px;">
+			DEBUG: Layout is loading - Mounted: {mounted}
+		</div>
+		<div class="loading-spinner"></div>
+		<p>Loading layout...</p>
+	</div>
+{:else if isLoading}
+	<div class="loading-container">
+		<div style="background: yellow; color: black; padding: 10px; margin: 10px;">
+			DEBUG: Layout is checking auth - Mounted: {mounted}, Loading: {isLoading}
+		</div>
 		<div class="loading-spinner"></div>
 		<p>Loading...</p>
 	</div>
@@ -69,6 +90,14 @@ function logout() {
 			<slot />
 		</section>
 	</main>
+{:else}
+	<div class="loading-container">
+		<div style="background: green; color: white; padding: 10px; margin: 10px;">
+			DEBUG: Layout not authenticated - Mounted: {mounted}, Loading: {isLoading}, Auth: {isAuthenticated}
+		</div>
+		<div class="loading-spinner"></div>
+		<p>Redirecting to login...</p>
+	</div>
 {/if}
 
 <style>
