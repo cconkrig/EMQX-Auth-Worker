@@ -49,6 +49,7 @@ async function loadUsers() {
 		}
 		
 		const data = await res.json();
+		console.log('Loaded users:', data.users);
 		users = data.users || [];
 	} catch (e: any) {
 		console.error('Load users error:', e);
@@ -135,6 +136,7 @@ async function saveUser() {
 		
 		if (formMode === 'add') {
 			// Add new user
+			console.log('Adding user:', formData.username);
 			const res = await fetch('/admin/api/user', {
 				method: 'POST',
 				headers: {
@@ -152,6 +154,8 @@ async function saveUser() {
 				const errorText = await res.text();
 				throw new Error(`Failed to add user: ${res.status} ${errorText}`);
 			}
+			
+			console.log('User added successfully');
 		} else if (formMode === 'edit' && selectedUser) {
 			// Update existing user
 			const res = await fetch('/admin/api/user', {
@@ -173,7 +177,18 @@ async function saveUser() {
 			}
 		}
 		
+		// Add a small delay to ensure the server has processed the request
+		await new Promise(resolve => setTimeout(resolve, 200));
+		
+		// Reload users to ensure we have the latest data from the server
 		await loadUsers();
+		
+		// If we're in add mode and the new user isn't in the list, try loading again after a longer delay
+		if (formMode === 'add' && !users.includes(formData.username)) {
+			console.log('User not found in list, retrying...');
+			await new Promise(resolve => setTimeout(resolve, 500));
+			await loadUsers();
+		}
 		cancelForm();
 	} catch (e: any) {
 		console.error('Save user error:', e);

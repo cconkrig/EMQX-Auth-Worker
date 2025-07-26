@@ -1,7 +1,6 @@
 <script lang="ts">
 import { onMount } from 'svelte';
 
-let message = 'Hello World';
 let mounted = false;
 
 onMount(() => {
