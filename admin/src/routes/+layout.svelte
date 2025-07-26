@@ -14,9 +14,14 @@ onMount(() => {
 	}
 	
 	// Verify token is still valid by making a test request
+	const controller = new AbortController();
+	const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+	
 	fetch('/admin/api/users', {
-		headers: { Authorization: `Bearer ${token}` }
+		headers: { Authorization: `Bearer ${token}` },
+		signal: controller.signal
 	}).then(res => {
+		clearTimeout(timeoutId);
 		if (res.ok) {
 			isAuthenticated = true;
 		} else {
@@ -24,6 +29,7 @@ onMount(() => {
 			goto('/admin/login');
 		}
 	}).catch(() => {
+		clearTimeout(timeoutId);
 		localStorage.removeItem('admin_token');
 		goto('/admin/login');
 	}).finally(() => {
