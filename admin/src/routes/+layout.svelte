@@ -19,6 +19,8 @@ onMount(() => {
 	}
 	
 	const token = localStorage.getItem('admin_token');
+	console.log('Token found in localStorage:', token ? 'YES' : 'NO');
+	
 	if (!token) {
 		console.log('No token found, redirecting to login');
 		goto('/admin/login');
@@ -29,14 +31,16 @@ onMount(() => {
 	const controller = new AbortController();
 	const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 	
-	console.log('Verifying token...');
+	console.log('Verifying token with /admin/api/users...');
 	fetch('/admin/api/users', {
 		headers: { Authorization: `Bearer ${token}` },
 		signal: controller.signal
 	}).then(res => {
 		clearTimeout(timeoutId);
-		console.log('Token verification response:', res.status);
+		console.log('Token verification response status:', res.status);
+		console.log('Token verification response ok:', res.ok);
 		if (res.ok) {
+			console.log('Token is valid, setting isAuthenticated to true');
 			isAuthenticated = true;
 		} else {
 			console.log('Token invalid, redirecting to login');
@@ -49,6 +53,7 @@ onMount(() => {
 		localStorage.removeItem('admin_token');
 		goto('/admin/login');
 	}).finally(() => {
+		console.log('Token verification complete, setting isLoading to false');
 		isLoading = false;
 	});
 });
@@ -76,13 +81,16 @@ function logout() {
 {:else if isLoading}
 	<div class="loading-container">
 		<div style="background: yellow; color: black; padding: 10px; margin: 10px;">
-			DEBUG: Layout is checking auth - Mounted: {mounted}, Loading: {isLoading}
+			DEBUG: Layout is checking auth - Mounted: {mounted}, Loading: {isLoading}, Path: {$page.url.pathname}
 		</div>
 		<div class="loading-spinner"></div>
 		<p>Loading...</p>
 	</div>
 {:else if isAuthenticated}
 	<main class="admin-root">
+		<div style="background: green; color: white; padding: 10px; margin: 10px;">
+			DEBUG: Layout authenticated - Mounted: {mounted}, Loading: {isLoading}, Auth: {isAuthenticated}, Path: {$page.url.pathname}
+		</div>
 		<nav class="sidebar">
 			<div class="sidebar-title">EMQX Admin</div>
 			<ul class="sidebar-nav">
@@ -98,8 +106,8 @@ function logout() {
 	</main>
 {:else}
 	<div class="loading-container">
-		<div style="background: green; color: white; padding: 10px; margin: 10px;">
-			DEBUG: Layout not authenticated - Mounted: {mounted}, Loading: {isLoading}, Auth: {isAuthenticated}
+		<div style="background: red; color: white; padding: 10px; margin: 10px;">
+			DEBUG: Layout not authenticated - Mounted: {mounted}, Loading: {isLoading}, Auth: {isAuthenticated}, Path: {$page.url.pathname}
 		</div>
 		<div class="loading-spinner"></div>
 		<p>Redirecting to login...</p>
