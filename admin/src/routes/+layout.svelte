@@ -208,33 +208,34 @@ function logout(reason = 'User logged out') {
 <style>
 :global(html) {
 	font-family: 'Inter', 'Roboto', 'Segoe UI', 'Helvetica Neue', Arial, 'Liberation Sans', 'sans-serif';
-	background: #181c24;
-	font-size: 18px;
+	background: #1a1a1a;
+	font-size: 16px;
 	color: #e5e7eb;
 }
 .admin-root {
 	display: flex;
 	min-height: 100vh;
-	background: linear-gradient(135deg, #23283a 0%, #181c24 100%);
+	background: #1a1a1a;
 }
 .sidebar {
 	width: 240px;
-	background: #23283a;
+	background: #2d2d2d;
 	color: #e5e7eb;
 	display: flex;
 	flex-direction: column;
 	align-items: stretch;
 	padding: 2rem 1.2rem 1.2rem 1.2rem;
-	box-shadow: 2px 0 16px rgba(0,0,0,0.12);
+	box-shadow: 1px 0 8px rgba(0,0,0,0.2);
 	z-index: 10;
+	border-right: 1px solid #404040;
 }
 .sidebar-title {
-	font-size: 1.5rem;
-	font-weight: 800;
+	font-size: 1.4rem;
+	font-weight: 700;
 	margin-bottom: 2.5rem;
-	letter-spacing: -1px;
+	letter-spacing: -0.5px;
 	text-align: center;
-	color: #60a5fa;
+	color: #3b82f6;
 }
 .sidebar-nav {
 	list-style: none;
@@ -242,16 +243,16 @@ function logout(reason = 'User logged out') {
 	margin: 0;
 	display: flex;
 	flex-direction: column;
-	gap: 1.2rem;
+	gap: 0.5rem;
 }
 .sidebar-nav li {
 	padding: 0.7rem 1rem;
-	border-radius: 0.6rem;
-	font-size: 1.1rem;
-	font-weight: 600;
+	border-radius: 0.4rem;
+	font-size: 1rem;
+	font-weight: 500;
 	cursor: pointer;
-	transition: background 0.18s, color 0.18s;
-	color: #e5e7eb;
+	transition: background 0.15s, color 0.15s;
+	color: #d1d5db;
 }
 .sidebar-nav li a {
 	color: inherit;
@@ -260,20 +261,20 @@ function logout(reason = 'User logged out') {
 	width: 100%;
 }
 .sidebar-nav li a.active, .sidebar-nav li a:hover {
-	background: #1e293b;
-	color: #60a5fa;
+	background: #404040;
+	color: #3b82f6;
 }
 .sidebar-nav .logout-link {
 	margin-top: auto;
 	background: #dc2626;
 	color: #fff;
 	text-align: center;
-	font-weight: 700;
-	transition: background 0.18s;
+	font-weight: 600;
+	transition: background 0.15s;
 	border: none;
-	border-radius: 0.6rem;
+	border-radius: 0.4rem;
 	padding: 0.7rem 1rem;
-	font-size: 1.1rem;
+	font-size: 1rem;
 	cursor: pointer;
 	width: 100%;
 }
@@ -282,10 +283,10 @@ function logout(reason = 'User logged out') {
 }
 .main-content {
 	flex: 1;
-	padding: 3.5rem 3.5rem 2.5rem 3.5rem;
+	padding: 3rem 3rem 2rem 3rem;
 	display: flex;
 	flex-direction: column;
-	gap: 2.5rem;
+	gap: 2rem;
 	background: transparent;
 	min-height: 100vh;
 }
@@ -296,15 +297,15 @@ function logout(reason = 'User logged out') {
 	align-items: center;
 	justify-content: center;
 	min-height: 100vh;
-	background: linear-gradient(135deg, #23283a 0%, #181c24 100%);
+	background: #1a1a1a;
 	color: #e5e7eb;
 }
 
 .loading-spinner {
-	width: 40px;
-	height: 40px;
-	border: 4px solid #374151;
-	border-top: 4px solid #60a5fa;
+	width: 32px;
+	height: 32px;
+	border: 3px solid #404040;
+	border-top: 3px solid #3b82f6;
 	border-radius: 50%;
 	animation: spin 1s linear infinite;
 	margin-bottom: 1rem;

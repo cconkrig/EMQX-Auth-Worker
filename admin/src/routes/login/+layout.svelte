@@ -7,8 +7,8 @@
 <style>
 :global(html) {
 	font-family: 'Inter', 'Roboto', 'Segoe UI', 'Helvetica Neue', Arial, 'Liberation Sans', 'sans-serif';
-	background: #181c24;
-	font-size: 18px;
+	background: #1a1a1a;
+	font-size: 16px;
 	color: #e5e7eb;
 }
 </style> 

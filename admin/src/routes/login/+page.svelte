@@ -147,18 +147,18 @@ async function handleSubmit() {
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	background: linear-gradient(135deg, #23283a 0%, #181c24 100%);
+	background: #1a1a1a;
 	padding: 2rem;
 }
 
 .login-card {
-	background: #23283a;
-	border-radius: 1rem;
-	padding: 3rem;
-	box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+	background: #2d2d2d;
+	border-radius: 0.5rem;
+	padding: 2.5rem;
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
 	width: 100%;
 	max-width: 400px;
-	border: 1px solid #374151;
+	border: 1px solid #404040;
 }
 
 .login-header {
@@ -167,40 +167,40 @@ async function handleSubmit() {
 }
 
 .login-header h1 {
-	font-size: 2rem;
-	font-weight: 800;
-	color: #60a5fa;
+	font-size: 1.8rem;
+	font-weight: 700;
+	color: #3b82f6;
 	margin-bottom: 0.5rem;
-	letter-spacing: -1px;
+	letter-spacing: -0.5px;
 }
 
 .login-header p {
 	color: #9ca3af;
-	font-size: 1rem;
+	font-size: 0.95rem;
 	margin: 0;
 }
 
 .bootstrap-notice {
-	color: #fbbf24 !important;
+	color: #f59e0b !important;
 	font-weight: 600;
 }
 
 .success-message {
-	background: #065f46;
+	background: #064e3b;
 	color: #d1fae5;
 	padding: 1rem;
-	border-radius: 0.5rem;
+	border-radius: 0.4rem;
 	margin-bottom: 1.5rem;
-	border: 1px solid #10b981;
+	border: 1px solid #047857;
 }
 
 .error-message {
 	background: #7f1d1d;
 	color: #fecaca;
 	padding: 1rem;
-	border-radius: 0.5rem;
+	border-radius: 0.4rem;
 	margin-bottom: 1.5rem;
-	border: 1px solid #ef4444;
+	border: 1px solid #dc2626;
 }
 
 .login-form {
@@ -222,19 +222,19 @@ async function handleSubmit() {
 }
 
 .form-group input {
-	background: #1e293b;
-	border: 1px solid #374151;
-	border-radius: 0.5rem;
+	background: #1a1a1a;
+	border: 1px solid #404040;
+	border-radius: 0.4rem;
 	padding: 0.75rem 1rem;
 	color: #e5e7eb;
 	font-size: 1rem;
-	transition: border-color 0.2s;
+	transition: border-color 0.15s;
 }
 
 .form-group input:focus {
 	outline: none;
-	border-color: #60a5fa;
-	box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.1);
+	border-color: #3b82f6;
+	box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
 }
 
 .form-group input:disabled {
@@ -243,20 +243,20 @@ async function handleSubmit() {
 }
 
 .login-button {
-	background: #60a5fa;
+	background: #3b82f6;
 	color: white;
 	border: none;
-	border-radius: 0.5rem;
+	border-radius: 0.4rem;
 	padding: 0.75rem 1rem;
 	font-size: 1rem;
 	font-weight: 600;
 	cursor: pointer;
-	transition: background-color 0.2s;
+	transition: background-color 0.15s;
 	margin-top: 0.5rem;
 }
 
 .login-button:hover:not(:disabled) {
-	background: #3b82f6;
+	background: #2563eb;
 }
 
 .login-button:disabled {

@@ -540,21 +540,21 @@ function cancelDelete() {
 
 <style>
 .dashboard-title {
-	font-size: 2.3rem;
-	font-weight: 800;
+	font-size: 2rem;
+	font-weight: 700;
 	color: #e5e7eb;
 	margin-bottom: 0.5rem;
-	letter-spacing: -1px;
+	letter-spacing: -0.5px;
 }
 
 .dashboard-error {
 	color: #f87171;
 	text-align: center;
-	font-size: 1.1rem;
+	font-size: 1rem;
 	margin-bottom: 1rem;
 	padding: 0.75rem;
 	background: rgba(248, 113, 113, 0.1);
-	border-radius: 0.5rem;
+	border-radius: 0.4rem;
 	border: 1px solid rgba(248, 113, 113, 0.3);
 }
 
@@ -570,20 +570,21 @@ function cancelDelete() {
 }
 
 .list-box {
-	background: #23283a;
-	border-radius: 1.2rem;
-	box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+	background: #2d2d2d;
+	border-radius: 0.5rem;
+	box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 	overflow: hidden;
 	margin-bottom: 1rem;
+	border: 1px solid #404040;
 }
 
 .list-header {
-	background: #1e293b;
-	color: #60a5fa;
-	font-size: 1.15rem;
-	font-weight: 700;
+	background: #404040;
+	color: #3b82f6;
+	font-size: 1.1rem;
+	font-weight: 600;
 	padding: 1rem 1.5rem;
-	border-bottom: 1px solid #334155;
+	border-bottom: 1px solid #525252;
 }
 
 .list-content {
@@ -594,9 +595,9 @@ function cancelDelete() {
 .list-item {
 	padding: 0.75rem 1.5rem;
 	cursor: pointer;
-	transition: background 0.2s;
+	transition: background 0.15s;
 	color: #e5e7eb;
-	border-bottom: 1px solid #334155;
+	border-bottom: 1px solid #404040;
 	font-size: 1rem;
 }
 
@@ -605,16 +606,16 @@ function cancelDelete() {
 }
 
 .list-item:hover {
-	background: #1e293b;
+	background: #404040;
 }
 
 .list-item.selected {
-	background: #2563eb;
+	background: #1e40af;
 	color: #fff;
 }
 
 .list-item:focus {
-	outline: 2px solid #60a5fa;
+	outline: 2px solid #3b82f6;
 	outline-offset: -2px;
 }
 
@@ -635,11 +636,11 @@ function cancelDelete() {
 	flex: 1;
 	padding: 0.75rem 1rem;
 	border: none;
-	border-radius: 0.7rem;
+	border-radius: 0.4rem;
 	font-size: 1rem;
 	font-weight: 600;
 	cursor: pointer;
-	transition: all 0.2s;
+	transition: background 0.15s;
 }
 
 .action-btn:disabled {
@@ -648,33 +649,30 @@ function cancelDelete() {
 }
 
 .add-btn {
-	background: linear-gradient(90deg, #059669 60%, #10b981 100%);
+	background: #059669;
 	color: white;
 }
 
 .add-btn:hover:not(:disabled) {
-	background: linear-gradient(90deg, #047857 60%, #059669 100%);
-	transform: translateY(-1px);
+	background: #047857;
 }
 
 .edit-btn {
-	background: linear-gradient(90deg, #2563eb 60%, #60a5fa 100%);
+	background: #2563eb;
 	color: white;
 }
 
 .edit-btn:hover:not(:disabled) {
-	background: linear-gradient(90deg, #1d4ed8 60%, #2563eb 100%);
-	transform: translateY(-1px);
+	background: #1d4ed8;
 }
 
 .delete-btn {
-	background: linear-gradient(90deg, #dc2626 60%, #ef4444 100%);
+	background: #dc2626;
 	color: white;
 }
 
 .delete-btn:hover:not(:disabled) {
-	background: linear-gradient(90deg, #b91c1c 60%, #dc2626 100%);
-	transform: translateY(-1px);
+	background: #b91c1c;
 }
 
 /* Right side - Form section */
@@ -683,19 +681,20 @@ function cancelDelete() {
 }
 
 .form-group-box {
-	background: #23283a;
-	border-radius: 1.2rem;
-	box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+	background: #2d2d2d;
+	border-radius: 0.5rem;
+	box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 	overflow: hidden;
+	border: 1px solid #404040;
 }
 
 .form-header {
-	background: #1e293b;
-	color: #60a5fa;
-	font-size: 1.15rem;
-	font-weight: 700;
+	background: #404040;
+	color: #3b82f6;
+	font-size: 1.1rem;
+	font-weight: 600;
 	padding: 1rem 1.5rem;
-	border-bottom: 1px solid #334155;
+	border-bottom: 1px solid #525252;
 }
 
 .form-content {
@@ -724,17 +723,17 @@ function cancelDelete() {
 .form-field input {
 	width: 100%;
 	padding: 0.75rem 1rem;
-	border: 1.5px solid #334155;
-	border-radius: 0.7rem;
+	border: 1px solid #404040;
+	border-radius: 0.4rem;
 	font-size: 1rem;
-	background: #181c24;
+	background: #1a1a1a;
 	color: #e5e7eb;
-	transition: border-color 0.2s, background 0.2s;
+	transition: border-color 0.15s, background 0.15s;
 }
 
 .form-field input:focus {
-	border-color: #60a5fa;
-	background: #23283a;
+	border-color: #3b82f6;
+	background: #2d2d2d;
 	outline: none;
 }
 
@@ -753,11 +752,11 @@ function cancelDelete() {
 	flex: 1;
 	padding: 0.75rem 1.5rem;
 	border: none;
-	border-radius: 0.7rem;
+	border-radius: 0.4rem;
 	font-size: 1rem;
 	font-weight: 600;
 	cursor: pointer;
-	transition: all 0.2s;
+	transition: background 0.15s;
 }
 
 .form-btn:disabled {
@@ -766,23 +765,21 @@ function cancelDelete() {
 }
 
 .save-btn {
-	background: linear-gradient(90deg, #059669 60%, #10b981 100%);
+	background: #059669;
 	color: white;
 }
 
 .save-btn:hover:not(:disabled) {
-	background: linear-gradient(90deg, #047857 60%, #059669 100%);
-	transform: translateY(-1px);
+	background: #047857;
 }
 
 .cancel-btn {
-	background: linear-gradient(90deg, #f59e0b 60%, #fbbf24 100%);
+	background: #f59e0b;
 	color: white;
 }
 
 .cancel-btn:hover:not(:disabled) {
-	background: linear-gradient(90deg, #d97706 60%, #f59e0b 100%);
-	transform: translateY(-1px);
+	background: #d97706;
 }
 
 /* Modal styles */
@@ -800,22 +797,23 @@ function cancelDelete() {
 }
 
 .modal-content {
-	background: #23283a;
-	border-radius: 1.2rem;
+	background: #2d2d2d;
+	border-radius: 0.5rem;
 	box-shadow: 0 4px 20px rgba(0,0,0,0.3);
 	max-width: 500px;
 	width: 90%;
 	margin: 1rem;
+	border: 1px solid #404040;
 }
 
 .modal-header {
-	background: #1e293b;
-	color: #60a5fa;
-	font-size: 1.2rem;
-	font-weight: 700;
+	background: #404040;
+	color: #3b82f6;
+	font-size: 1.1rem;
+	font-weight: 600;
 	padding: 1rem 1.5rem;
-	border-bottom: 1px solid #334155;
-	border-radius: 1.2rem 1.2rem 0 0;
+	border-bottom: 1px solid #525252;
+	border-radius: 0.5rem 0.5rem 0 0;
 }
 
 .modal-body {
@@ -829,7 +827,7 @@ function cancelDelete() {
 }
 
 .warning-text {
-	color: #fbbf24;
+	color: #f59e0b;
 	font-weight: 600;
 }
 
@@ -843,11 +841,11 @@ function cancelDelete() {
 	flex: 1;
 	padding: 0.75rem 1.5rem;
 	border: none;
-	border-radius: 0.7rem;
+	border-radius: 0.4rem;
 	font-size: 1rem;
 	font-weight: 600;
 	cursor: pointer;
-	transition: all 0.2s;
+	transition: background 0.15s;
 }
 
 .modal-btn:disabled {
@@ -857,11 +855,11 @@ function cancelDelete() {
 
 /* Save Progress styles */
 .save-progress {
-	background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
-	border-radius: 0.8rem;
+	background: #1e40af;
+	border-radius: 0.4rem;
 	padding: 1rem;
 	margin-bottom: 1rem;
-	border: 1px solid #60a5fa;
+	border: 1px solid #3b82f6;
 }
 
 .progress-message {
@@ -890,8 +888,8 @@ function cancelDelete() {
 
 /* Delete Progress styles */
 .delete-progress {
-	background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
-	border-radius: 0.8rem;
+	background: #dc2626;
+	border-radius: 0.4rem;
 	padding: 1rem;
 	margin-bottom: 1rem;
 	border: 1px solid #ef4444;
@@ -903,11 +901,11 @@ function cancelDelete() {
 
 /* Modal Progress styles */
 .modal-progress {
-	background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
-	border-radius: 0.8rem;
+	background: #1e40af;
+	border-radius: 0.4rem;
 	padding: 1rem;
 	margin-bottom: 1rem;
-	border: 1px solid #60a5fa;
+	border: 1px solid #3b82f6;
 }
 
 .modal-progress .progress-message {
@@ -929,7 +927,6 @@ function cancelDelete() {
 .action-btn:disabled {
 	opacity: 0.5;
 	cursor: not-allowed;
-	transform: none !important;
 }
 
 /* Responsive design */

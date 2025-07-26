@@ -3,15 +3,15 @@
 
 <style>
 .dashboard-title {
-	font-size: 2.3rem;
-	font-weight: 800;
+	font-size: 2rem;
+	font-weight: 700;
 	color: #e5e7eb;
 	margin-bottom: 0.5rem;
-	letter-spacing: -1px;
+	letter-spacing: -0.5px;
 }
 .dashboard-desc {
-	font-size: 1.2rem;
-	color: #a3a3a3;
+	font-size: 1.1rem;
+	color: #9ca3af;
 	margin-bottom: 2rem;
 }
 </style> 
