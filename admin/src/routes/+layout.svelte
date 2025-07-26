@@ -7,6 +7,12 @@ let isAuthenticated = false;
 let isLoading = true;
 
 onMount(() => {
+	// If we're already on the login page, don't check authentication
+	if (window.location.pathname === '/admin/login') {
+		isLoading = false;
+		return;
+	}
+	
 	const token = localStorage.getItem('admin_token');
 	if (!token) {
 		goto('/admin/login');
