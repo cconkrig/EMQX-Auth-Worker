@@ -84,6 +84,8 @@ async function addUser() {
 	dashboardLoading = true;
 	try {
 		const token = getToken();
+		console.log('Adding user with token:', token ? token.substring(0, 20) + '...' : 'null');
+		
 		if (!token) {
 			throw new Error('No authentication token found');
 		}
@@ -105,10 +107,18 @@ async function addUser() {
 				acls: []
 			})
 		});
-		if (!res.ok) throw new Error('Failed to add user');
+		
+		console.log('Add user response status:', res.status);
+		if (!res.ok) {
+			const errorText = await res.text();
+			console.log('Add user error response:', errorText);
+			throw new Error(`Failed to add user: ${res.status} ${errorText}`);
+		}
+		
 		await loadUsers();
 		newUser = { username: '', password: '' };
 	} catch (e: any) {
+		console.log('Add user error:', e);
 		dashboardError = e.message || 'Failed to add user';
 	} finally {
 		dashboardLoading = false;

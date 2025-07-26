@@ -106,8 +106,10 @@ function removeActivityListeners() {
 
 function checkAuthentication() {
 	const token = localStorage.getItem('admin_token');
+	console.log('Checking authentication with token:', token ? token.substring(0, 20) + '...' : 'null');
 	
 	if (!token) {
+		console.log('No token found, redirecting to login');
 		goto('/admin/login');
 		return;
 	}
@@ -125,16 +127,20 @@ function checkAuthentication() {
 		signal: controller.signal
 	}).then(res => {
 		clearTimeout(timeoutId);
+		console.log('Auth check response status:', res.status);
 		if (res.ok) {
+			console.log('Authentication successful');
 			isAuthenticated = true;
 			// Reset session timeout when authentication is successful
 			resetSessionTimeout();
 		} else {
+			console.log('Authentication failed, redirecting to login');
 			localStorage.removeItem('admin_token');
 			goto('/admin/login');
 		}
 	}).catch((error) => {
 		clearTimeout(timeoutId);
+		console.log('Authentication error:', error);
 		localStorage.removeItem('admin_token');
 		goto('/admin/login');
 	}).finally(() => {
