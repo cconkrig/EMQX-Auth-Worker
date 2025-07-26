@@ -266,6 +266,8 @@ function logout(reason = 'User logged out') {
 .sidebar-nav li a.active, .sidebar-nav li a:hover {
 	background: #404040;
 	color: #3b82f6;
+	transform: translateX(4px) rotateY(-2deg);
+	box-shadow: 2px 0 8px rgba(0, 0, 0, 0.3);
 }
 .sidebar-nav .logout-link {
 	margin-top: auto;
