@@ -39,7 +39,7 @@ async function loadUsers() {
 			(window as any).resetSessionTimeout();
 		}
 		
-		const res = await fetch('/admin/api/users', {
+		const res = await fetch(`/admin/api/users?t=${Date.now()}`, {
 			headers: { Authorization: `Bearer ${token}` }
 		});
 		
@@ -177,16 +177,26 @@ async function saveUser() {
 			}
 		}
 		
-		// Add a small delay to ensure the server has processed the request
-		await new Promise(resolve => setTimeout(resolve, 200));
-		
-		// Reload users to ensure we have the latest data from the server
-		await loadUsers();
-		
-		// If we're in add mode and the new user isn't in the list, try loading again after a longer delay
-		if (formMode === 'add' && !users.includes(formData.username)) {
-			console.log('User not found in list, retrying...');
-			await new Promise(resolve => setTimeout(resolve, 500));
+		// For add mode, implement a more robust retry mechanism
+		if (formMode === 'add') {
+			let retryCount = 0;
+			const maxRetries = 5;
+			const retryDelay = 1000;
+			
+			while (retryCount < maxRetries && !users.includes(formData.username)) {
+				console.log(`Retry ${retryCount + 1}/${maxRetries} - waiting ${retryDelay}ms...`);
+				await new Promise(resolve => setTimeout(resolve, retryDelay));
+				await loadUsers();
+				retryCount++;
+			}
+			
+			if (!users.includes(formData.username)) {
+				console.warn('User still not found after all retries, but operation was successful');
+			} else {
+				console.log('User found in list after retry');
+			}
+		} else {
+			// For edit mode, just reload once
 			await loadUsers();
 		}
 		cancelForm();
