@@ -270,7 +270,17 @@ export default {
       (url.pathname === "/admin" || url.pathname.startsWith("/admin/")) &&
       request.method === "GET"
     ) {
-      const response = await env.ASSETS.fetch(request);
+      // For SPA routing, try to serve the specific file first, then fallback to index.html
+      let response = await env.ASSETS.fetch(request);
+      
+      // If the file doesn't exist (404), serve index.html for SPA routing
+      if (response.status === 404) {
+        const indexRequest = new Request(new URL('/admin/index.html', request.url), {
+          method: 'GET',
+          headers: request.headers
+        });
+        response = await env.ASSETS.fetch(indexRequest);
+      }
       
       // Add admin security headers to the response
       const newHeaders = new Headers(response.headers);
