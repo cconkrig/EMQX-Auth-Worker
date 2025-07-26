@@ -86,6 +86,10 @@ async function handleSubmit() {
 </script>
 
 <div class="login-container">
+	<!-- DEBUG: This should be visible if the login page is rendering -->
+	<div style="background: red; color: white; padding: 10px; margin: 10px;">
+		DEBUG: Login page is rendering
+	</div>
 	<div class="login-card">
 		<div class="login-header">
 			<h1>EMQX Admin</h1>
