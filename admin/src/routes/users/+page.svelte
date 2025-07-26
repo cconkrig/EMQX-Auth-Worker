@@ -501,9 +501,20 @@ function cancelDelete() {
 
 <!-- Delete confirmation modal -->
 {#if showDeleteConfirm}
-	<div class="modal-overlay" on:click={cancelDelete}>
-		<div class="modal-content" on:click|stopPropagation>
-			<div class="modal-header">Confirm Delete</div>
+	<div 
+		class="modal-overlay" 
+		on:click={cancelDelete}
+		on:keydown={(e) => e.key === 'Escape' && cancelDelete()}
+		role="dialog"
+		aria-modal="true"
+		aria-labelledby="modal-title"
+		tabindex="-1"
+	>
+		<div 
+			class="modal-content" 
+			role="document"
+		>
+			<div class="modal-header" id="modal-title">Confirm Delete</div>
 			<div class="modal-body">
 				<p>Are you sure you want to delete user <strong>{userToDelete}</strong>?</p>
 				<p class="warning-text">⚠️ This will also remove all ACLs associated with this user.</p>
