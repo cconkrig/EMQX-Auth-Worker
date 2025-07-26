@@ -10,6 +10,14 @@ const corsHeaders = {
   "Referrer-Policy": "no-referrer",
 };
 
+// Admin UI security headers - allows SvelteKit to run
+const adminHeaders = {
+  "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none';",
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "no-referrer",
+};
+
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -262,7 +270,19 @@ export default {
       (url.pathname === "/admin" || url.pathname.startsWith("/admin/")) &&
       request.method === "GET"
     ) {
-      return await env.ASSETS.fetch(request);
+      const response = await env.ASSETS.fetch(request);
+      
+      // Add admin security headers to the response
+      const newHeaders = new Headers(response.headers);
+      Object.entries(adminHeaders).forEach(([key, value]) => {
+        newHeaders.set(key, value);
+      });
+      
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: newHeaders,
+      });
     }
 
     // Handle admin API (POST/GET as needed)
