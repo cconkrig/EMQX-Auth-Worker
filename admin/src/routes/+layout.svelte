@@ -9,17 +9,14 @@ let mounted = false;
 
 // Reactive statement to handle authentication when pathname changes
 $: if (mounted && $page.url.pathname !== '/admin/login') {
-	console.log('Pathname changed to:', $page.url.pathname, '- checking authentication');
 	checkAuthentication();
 }
 
 onMount(() => {
-	console.log('Layout mounted, pathname:', $page.url.pathname);
 	mounted = true;
 	
 	// If we're already on the login page, don't check authentication
 	if ($page.url.pathname === '/admin/login') {
-		console.log('On login page, skipping auth check');
 		isLoading = false;
 		return;
 	}
@@ -30,10 +27,8 @@ onMount(() => {
 
 function checkAuthentication() {
 	const token = localStorage.getItem('admin_token');
-	console.log('Token found in localStorage:', token ? 'YES' : 'NO');
 	
 	if (!token) {
-		console.log('No token found, redirecting to login');
 		goto('/admin/login');
 		return;
 	}
@@ -46,29 +41,22 @@ function checkAuthentication() {
 	const controller = new AbortController();
 	const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 	
-	console.log('Verifying token with /admin/api/users...');
 	fetch('/admin/api/users', {
 		headers: { Authorization: `Bearer ${token}` },
 		signal: controller.signal
 	}).then(res => {
 		clearTimeout(timeoutId);
-		console.log('Token verification response status:', res.status);
-		console.log('Token verification response ok:', res.ok);
 		if (res.ok) {
-			console.log('Token is valid, setting isAuthenticated to true');
 			isAuthenticated = true;
 		} else {
-			console.log('Token invalid, redirecting to login');
 			localStorage.removeItem('admin_token');
 			goto('/admin/login');
 		}
 	}).catch((error) => {
 		clearTimeout(timeoutId);
-		console.log('Token verification error:', error);
 		localStorage.removeItem('admin_token');
 		goto('/admin/login');
 	}).finally(() => {
-		console.log('Token verification complete, setting isLoading to false');
 		isLoading = false;
 	});
 }
@@ -81,33 +69,21 @@ function logout() {
 
 {#if !mounted}
 	<div class="loading-container">
-		<div style="background: orange; color: white; padding: 10px; margin: 10px;">
-			DEBUG: Layout is loading - Mounted: {mounted}
-		</div>
 		<div class="loading-spinner"></div>
-		<p>Loading layout...</p>
+		<p>Loading...</p>
 	</div>
 {:else if $page.url.pathname === '/admin/login'}
 	<!-- Login page - render without authentication check -->
-	<div style="background: purple; color: white; padding: 10px; margin: 10px;">
-		DEBUG: Layout rendering login page - Mounted: {mounted}, Path: {$page.url.pathname}
-	</div>
 	<slot />
 {:else if isLoading}
 	<div class="loading-container">
-		<div style="background: yellow; color: black; padding: 10px; margin: 10px;">
-			DEBUG: Layout is checking auth - Mounted: {mounted}, Loading: {isLoading}, Path: {$page.url.pathname}
-		</div>
 		<div class="loading-spinner"></div>
 		<p>Loading...</p>
 	</div>
 {:else if isAuthenticated}
 	<main class="admin-root">
-		<div style="background: green; color: white; padding: 10px; margin: 10px;">
-			DEBUG: Layout authenticated - Mounted: {mounted}, Loading: {isLoading}, Auth: {isAuthenticated}, Path: {$page.url.pathname}
-		</div>
 		<nav class="sidebar">
-			<div class="sidebar-title">EMQX Admin</div>
+			<div class="sidebar-title">CARRELink Admin</div>
 			<ul class="sidebar-nav">
 				<li><a href="/admin/" class:active={$page.url.pathname === '/admin/'}>Dashboard</a></li>
 				<li><a href="/admin/users" class:active={$page.url.pathname === '/admin/users'}>Users</a></li>
@@ -121,9 +97,6 @@ function logout() {
 	</main>
 {:else}
 	<div class="loading-container">
-		<div style="background: red; color: white; padding: 10px; margin: 10px;">
-			DEBUG: Layout not authenticated - Mounted: {mounted}, Loading: {isLoading}, Auth: {isAuthenticated}, Path: {$page.url.pathname}
-		</div>
 		<div class="loading-spinner"></div>
 		<p>Redirecting to login...</p>
 	</div>

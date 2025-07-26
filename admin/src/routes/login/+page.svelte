@@ -11,37 +11,27 @@ let bootstrapMessage = '';
 let mounted = false;
 
 onMount(async () => {
-	console.log('Login page mounted - starting bootstrap check');
 	mounted = true;
 	
 	// Check if we're in bootstrap mode (no admin users exist)
 	try {
-		console.log('Making bootstrap API call to /admin/api/bootstrap...');
 		const res = await fetch('/admin/api/bootstrap', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ username: 'test', password: 'test' })
 		});
-		console.log('Bootstrap API response status:', res.status);
-		console.log('Bootstrap API response headers:', Object.fromEntries(res.headers.entries()));
 		
 		if (res.status === 400) {
 			const data = await res.json();
-			console.log('Bootstrap API data (400 response):', data);
 			if (data.error === 'Not Allowed') {
-				console.log('Setting isBootstrapMode to false (admin users exist)');
 				isBootstrapMode = false;
 			} else {
-				console.log('Setting isBootstrapMode to true (no admin users)');
 				isBootstrapMode = true;
 			}
 		} else {
-			console.log('Setting isBootstrapMode to true (non-400 response)');
 			isBootstrapMode = true;
 		}
 	} catch (e) {
-		console.error('Bootstrap API error:', e);
-		console.log('Setting isBootstrapMode to false due to error');
 		// If we can't reach the bootstrap endpoint, assume normal login mode
 		isBootstrapMode = false;
 	}
@@ -95,13 +85,9 @@ async function handleSubmit() {
 
 {#if mounted}
 	<div class="login-container">
-		<!-- DEBUG: This should be visible if the login page is rendering -->
-		<div style="background: red; color: white; padding: 10px; margin: 10px;">
-			DEBUG: Login page is rendering - Mounted: {mounted}, BootstrapMode: {isBootstrapMode}
-		</div>
 		<div class="login-card">
 			<div class="login-header">
-				<h1>EMQX Admin</h1>
+				<h1>CARRELink Admin</h1>
 				{#if isBootstrapMode}
 					<p class="bootstrap-notice">First-time setup: Create your admin account</p>
 				{:else}
@@ -150,9 +136,6 @@ async function handleSubmit() {
 	</div>
 {:else}
 	<div class="login-container">
-		<div style="background: blue; color: white; padding: 10px; margin: 10px;">
-			DEBUG: Login page is loading - Mounted: {mounted}
-		</div>
 		<div class="loading-spinner"></div>
 		<p>Loading login page...</p>
 	</div>
