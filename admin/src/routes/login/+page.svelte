@@ -91,7 +91,7 @@ async function handleSubmit() {
 				{#if isBootstrapMode}
 					<p class="bootstrap-notice">First-time setup: Create your admin account</p>
 				{:else}
-					<p>Sign in to manage users and ACLs</p>
+					<p>Restricted Access - Authorized Personnel Only</p>
 				{/if}
 			</div>
 

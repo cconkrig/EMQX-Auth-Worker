@@ -39,10 +39,32 @@ async function loadUsers() {
 		const res = await fetch('/admin/api/users', {
 			headers: { Authorization: `Bearer ${token}` }
 		});
-		if (!res.ok) throw new Error('Failed to load users');
-		const data = await res.json();
+		
+		console.log('Load users response status:', res.status);
+		console.log('Load users response headers:', Object.fromEntries(res.headers.entries()));
+		
+		if (!res.ok) {
+			const errorText = await res.text();
+			console.log('Load users error response:', errorText);
+			throw new Error(`Failed to load users: ${res.status} ${errorText}`);
+		}
+		
+		const responseText = await res.text();
+		console.log('Load users response text:', responseText);
+		
+		let data;
+		try {
+			data = JSON.parse(responseText);
+		} catch (parseError: any) {
+			console.error('JSON parse error:', parseError);
+			console.error('Response text that failed to parse:', responseText);
+			throw new Error(`Invalid JSON response: ${parseError.message}`);
+		}
+		
+		console.log('Parsed users data:', data);
 		users = data.users || [];
 	} catch (e: any) {
+		console.error('Load users error:', e);
 		dashboardError = e.message || 'Failed to load users';
 	} finally {
 		dashboardLoading = false;
