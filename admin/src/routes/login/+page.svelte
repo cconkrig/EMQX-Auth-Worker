@@ -10,17 +10,21 @@ let isBootstrapMode = false;
 let bootstrapMessage = '';
 
 onMount(async () => {
+	console.log('Login page mounted');
 	// Check if we're in bootstrap mode (no admin users exist)
 	try {
+		console.log('Making bootstrap API call...');
 		const res = await fetch('/admin/api/bootstrap', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ username: 'test', password: 'test' })
 		});
+		console.log('Bootstrap API response:', res.status);
 		
 		if (res.status === 400) {
 			const data = await res.json();
-			if (data.error === 'Admin user already exists') {
+			console.log('Bootstrap API data:', data);
+			if (data.error === 'Not Allowed') {
 				isBootstrapMode = false;
 			} else {
 				isBootstrapMode = true;
@@ -29,6 +33,7 @@ onMount(async () => {
 			isBootstrapMode = true;
 		}
 	} catch (e) {
+		console.error('Bootstrap API error:', e);
 		// If we can't reach the bootstrap endpoint, assume normal login mode
 		isBootstrapMode = false;
 	}

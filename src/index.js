@@ -127,7 +127,7 @@ async function handleAdminApi(request, env) {
       // Check if any admin users exist
       const adminList = await env.USERS.list({ prefix: "admin:" });
       if (adminList.keys.length > 0) {
-        return jsonResponse({ error: "Admin user already exists" }, 400);
+        return jsonResponse({ error: "Not Allowed" }, 400);
       }
 
       const { username, password } = await request.json();
