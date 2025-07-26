@@ -1,18 +1,21 @@
 <script lang="ts">
 import { onMount } from 'svelte';
+
+// Data state
 let users: string[] = [];
 let selectedUser: string | null = null;
 let userAcls: any[] = [];
-let newUser = { username: '', password: '' };
 let dashboardError = '';
 let dashboardLoading = false;
 
-// ACL UI state
-let aclAction = 'publish';
-let aclTopic = '';
-let aclEditIndex: number | null = null;
-let aclEditAction = 'publish';
-let aclEditTopic = '';
+// Form state
+let formMode: 'none' | 'add' | 'edit' = 'none';
+let formData = { username: '', password: '' };
+let formEnabled = false;
+
+// Confirmation state
+let showDeleteConfirm = false;
+let userToDelete: string | null = null;
 
 function getToken() {
 	return localStorage.getItem('admin_token');
@@ -40,28 +43,12 @@ async function loadUsers() {
 			headers: { Authorization: `Bearer ${token}` }
 		});
 		
-		console.log('Load users response status:', res.status);
-		console.log('Load users response headers:', Object.fromEntries(res.headers.entries()));
-		
 		if (!res.ok) {
 			const errorText = await res.text();
-			console.log('Load users error response:', errorText);
 			throw new Error(`Failed to load users: ${res.status} ${errorText}`);
 		}
 		
-		const responseText = await res.text();
-		console.log('Load users response text:', responseText);
-		
-		let data;
-		try {
-			data = JSON.parse(responseText);
-		} catch (parseError: any) {
-			console.error('JSON parse error:', parseError);
-			console.error('Response text that failed to parse:', responseText);
-			throw new Error(`Invalid JSON response: ${parseError.message}`);
-		}
-		
-		console.log('Parsed users data:', data);
+		const data = await res.json();
 		users = data.users || [];
 	} catch (e: any) {
 		console.error('Load users error:', e);
@@ -75,6 +62,10 @@ async function selectUser(user: string) {
 	selectedUser = user;
 	userAcls = [];
 	dashboardError = '';
+	formMode = 'none';
+	formEnabled = false;
+	clearForm();
+	
 	try {
 		const token = getToken();
 		if (!token) {
@@ -97,17 +88,42 @@ async function selectUser(user: string) {
 	}
 }
 
-async function addUser() {
-	dashboardError = '';
-	if (!newUser.username || !newUser.password) {
+function clearForm() {
+	formData = { username: '', password: '' };
+}
+
+function enableAddMode() {
+	formMode = 'add';
+	formEnabled = true;
+	clearForm();
+	selectedUser = null;
+}
+
+function enableEditMode() {
+	if (!selectedUser) return;
+	formMode = 'edit';
+	formEnabled = true;
+	formData.username = selectedUser;
+	formData.password = ''; // Never load password
+}
+
+function cancelForm() {
+	formMode = 'none';
+	formEnabled = false;
+	clearForm();
+}
+
+async function saveUser() {
+	if (!formData.username || !formData.password) {
 		dashboardError = 'Username and password required';
 		return;
 	}
+	
 	dashboardLoading = true;
+	dashboardError = '';
+	
 	try {
 		const token = getToken();
-		console.log('Adding user with token:', token ? token.substring(0, 20) + '...' : 'null');
-		
 		if (!token) {
 			throw new Error('No authentication token found');
 		}
@@ -117,39 +133,67 @@ async function addUser() {
 			(window as any).resetSessionTimeout();
 		}
 		
-		const res = await fetch('/admin/api/user', {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				Authorization: `Bearer ${token}`
-			},
-			body: JSON.stringify({
-				username: newUser.username,
-				password: newUser.password,
-				acls: []
-			})
-		});
-		
-		console.log('Add user response status:', res.status);
-		if (!res.ok) {
-			const errorText = await res.text();
-			console.log('Add user error response:', errorText);
-			throw new Error(`Failed to add user: ${res.status} ${errorText}`);
+		if (formMode === 'add') {
+			// Add new user
+			const res = await fetch('/admin/api/user', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${token}`
+				},
+				body: JSON.stringify({
+					username: formData.username,
+					password: formData.password,
+					acls: []
+				})
+			});
+			
+			if (!res.ok) {
+				const errorText = await res.text();
+				throw new Error(`Failed to add user: ${res.status} ${errorText}`);
+			}
+		} else if (formMode === 'edit' && selectedUser) {
+			// Update existing user
+			const res = await fetch('/admin/api/user', {
+				method: 'PUT',
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${token}`
+				},
+				body: JSON.stringify({
+					username: selectedUser,
+					newUsername: formData.username,
+					password: formData.password
+				})
+			});
+			
+			if (!res.ok) {
+				const errorText = await res.text();
+				throw new Error(`Failed to update user: ${res.status} ${errorText}`);
+			}
 		}
 		
 		await loadUsers();
-		newUser = { username: '', password: '' };
+		cancelForm();
 	} catch (e: any) {
-		console.log('Add user error:', e);
-		dashboardError = e.message || 'Failed to add user';
+		console.error('Save user error:', e);
+		dashboardError = e.message || 'Failed to save user';
 	} finally {
 		dashboardLoading = false;
 	}
 }
 
-async function deleteUser(user: string) {
+function confirmDeleteUser(user: string) {
+	userToDelete = user;
+	showDeleteConfirm = true;
+}
+
+async function deleteUser() {
+	if (!userToDelete) return;
+	
 	dashboardError = '';
 	dashboardLoading = true;
+	
 	try {
 		const token = getToken();
 		if (!token) {
@@ -167,140 +211,169 @@ async function deleteUser(user: string) {
 				'Content-Type': 'application/json',
 				Authorization: `Bearer ${token}`
 			},
-			body: JSON.stringify({ username: user })
+			body: JSON.stringify({ username: userToDelete })
 		});
+		
 		if (!res.ok) throw new Error('Failed to delete user');
+		
 		await loadUsers();
-		if (selectedUser === user) selectedUser = null;
+		if (selectedUser === userToDelete) {
+			selectedUser = null;
+			formMode = 'none';
+			formEnabled = false;
+			clearForm();
+		}
 	} catch (e: any) {
 		dashboardError = e.message || 'Failed to delete user';
 	} finally {
 		dashboardLoading = false;
+		showDeleteConfirm = false;
+		userToDelete = null;
 	}
 }
 
-async function updateAcls() {
-	dashboardError = '';
-	dashboardLoading = true;
-	try {
-		const token = getToken();
-		if (!token) {
-			throw new Error('No authentication token found');
-		}
-		
-		// Reset session timeout for API activity
-		if (typeof window !== 'undefined' && (window as any).resetSessionTimeout) {
-			(window as any).resetSessionTimeout();
-		}
-		
-		const res = await fetch('/admin/api/acl', {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				Authorization: `Bearer ${token}`
-			},
-			body: JSON.stringify({ username: selectedUser, acls: userAcls })
-		});
-		if (!res.ok) throw new Error('Failed to update ACLs');
-	} catch (e: any) {
-		dashboardError = e.message || 'Failed to update ACLs';
-	} finally {
-		dashboardLoading = false;
-	}
-}
-
-function resetAclForm() {
-	aclAction = 'publish';
-	aclTopic = '';
-	aclEditIndex = null;
-	aclEditAction = 'publish';
-	aclEditTopic = '';
-}
-
-function addAclRule() {
-	if (!aclTopic.trim()) return;
-	userAcls = [...userAcls, { action: aclAction, topic: aclTopic.trim() }];
-	resetAclForm();
-}
-
-function startEditAclRule(i: number) {
-	aclEditIndex = i;
-	aclEditAction = userAcls[i].action;
-	aclEditTopic = userAcls[i].topic;
-}
-
-function saveEditAclRule() {
-	if (aclEditIndex === null || !aclEditTopic.trim()) return;
-	userAcls[aclEditIndex] = { action: aclEditAction, topic: aclEditTopic.trim() };
-	userAcls = [...userAcls];
-	resetAclForm();
-}
-
-function deleteAclRule(i: number) {
-	userAcls.splice(i, 1);
-	userAcls = [...userAcls];
-	resetAclForm();
+function cancelDelete() {
+	showDeleteConfirm = false;
+	userToDelete = null;
 }
 </script>
 
 <div class="dashboard-title">User Management</div>
+
 {#if dashboardError}
 	<div class="dashboard-error">{dashboardError}</div>
 {/if}
-<div class="user-section">
-	<div class="user-list-title">Users:</div>
-	<div class="user-list">
-		{#each users as user}
-			<div 
-				class="user-item {selectedUser === user ? 'selected' : ''}" 
-				on:click={() => selectUser(user)}
-				on:keydown={(e) => e.key === 'Enter' && selectUser(user)}
-				role="button"
-				tabindex="0"
-			>
-				{user}
-				<button class="delete-btn" on:click|stopPropagation={() => deleteUser(user)} title="Delete user">✕</button>
+
+<div class="user-management-container">
+	<!-- Left side: User list and action buttons -->
+	<div class="user-list-section">
+		<div class="list-box">
+			<div class="list-header">Users</div>
+			<div class="list-content">
+				{#if dashboardLoading && users.length === 0}
+					<div class="loading-item">Loading users...</div>
+				{:else if users.length === 0}
+					<div class="empty-item">No users found</div>
+				{:else}
+					{#each users as user}
+						<div 
+							class="list-item {selectedUser === user ? 'selected' : ''}" 
+							on:click={() => selectUser(user)}
+							on:keydown={(e) => e.key === 'Enter' && selectUser(user)}
+							role="button"
+							tabindex="0"
+						>
+							{user}
+						</div>
+					{/each}
+				{/if}
 			</div>
-		{/each}
-	</div>
-	<form class="add-user-form" on:submit|preventDefault={addUser}>
-		<input type="text" placeholder="New username" bind:value={newUser.username} required />
-		<input type="password" placeholder="Password" bind:value={newUser.password} required />
-		<button type="submit" disabled={dashboardLoading}>Add User</button>
-	</form>
-</div>
-{#if selectedUser}
-	<div class="user-details">
-		<div class="user-details-title">ACLs for <span>{selectedUser}</span></div>
-		<ul class="acl-list">
-			{#each userAcls as rule, i}
-				<li class="acl-rule">
-					{#if aclEditIndex === i}
-						<select bind:value={aclEditAction}>
-							<option value="publish">publish</option>
-							<option value="subscribe">subscribe</option>
-						</select>
-						<input type="text" bind:value={aclEditTopic} placeholder="Topic" />
-						<button class="save-btn" on:click={saveEditAclRule}>Save</button>
-						<button class="cancel-btn" on:click={resetAclForm}>Cancel</button>
-						<button class="delete-btn" on:click={() => deleteAclRule(i)}>Delete</button>
-					{:else}
-						<span class="acl-action">{rule.action}</span> <span class="acl-on">on</span> <span class="acl-topic">{rule.topic}</span>
-						<button class="edit-btn" on:click={() => startEditAclRule(i)}>Edit</button>
-						<button class="delete-btn" on:click={() => deleteAclRule(i)}>Delete</button>
-					{/if}
-				</li>
-		{/each}
-		</ul>
-		<div class="acl-add-form">
-			<select bind:value={aclAction}>
-				<option value="publish">publish</option>
-				<option value="subscribe">subscribe</option>
-			</select>
-			<input type="text" bind:value={aclTopic} placeholder="Topic" />
-			<button class="add-btn" on:click={addAclRule}>Add Rule</button>
 		</div>
-		<button class="save-btn wide" on:click={updateAcls} disabled={dashboardLoading}>Save ACLs</button>
+		
+		<div class="action-buttons">
+			<button 
+				class="action-btn add-btn" 
+				on:click={enableAddMode}
+				disabled={formMode !== 'none'}
+			>
+				Add
+			</button>
+			<button 
+				class="action-btn edit-btn" 
+				on:click={enableEditMode}
+				disabled={!selectedUser || formMode !== 'none'}
+			>
+				Edit
+			</button>
+			<button 
+				class="action-btn delete-btn" 
+				on:click={() => confirmDeleteUser(selectedUser!)}
+				disabled={!selectedUser || formMode !== 'none'}
+			>
+				Delete
+			</button>
+		</div>
+	</div>
+
+	<!-- Right side: Form group box -->
+	<div class="form-section">
+		<div class="form-group-box">
+			<div class="form-header">
+				{#if formMode === 'add'}
+					Add New User
+				{:else if formMode === 'edit'}
+					Edit User
+				{:else}
+					User Details
+				{/if}
+			</div>
+			
+			<div class="form-content">
+				{#if formMode === 'none'}
+					<div class="form-placeholder">
+						Select a user from the list or click "Add" to create a new user.
+					</div>
+				{:else}
+					<div class="form-field">
+						<label for="username">Username</label>
+						<input 
+							id="username"
+							type="text" 
+							bind:value={formData.username}
+							disabled={!formEnabled}
+							placeholder="Enter username"
+						/>
+					</div>
+					
+					<div class="form-field">
+						<label for="password">Password</label>
+						<input 
+							id="password"
+							type="password" 
+							bind:value={formData.password}
+							disabled={!formEnabled}
+							placeholder="Enter password"
+						/>
+					</div>
+					
+					<div class="form-actions">
+						<button 
+							class="form-btn save-btn" 
+							on:click={saveUser}
+							disabled={!formEnabled || dashboardLoading}
+						>
+							Save
+						</button>
+						<button 
+							class="form-btn cancel-btn" 
+							on:click={cancelForm}
+							disabled={!formEnabled || dashboardLoading}
+						>
+							Cancel
+						</button>
+					</div>
+				{/if}
+			</div>
+		</div>
+	</div>
+</div>
+
+<!-- Delete confirmation modal -->
+{#if showDeleteConfirm}
+	<div class="modal-overlay" on:click={cancelDelete}>
+		<div class="modal-content" on:click|stopPropagation>
+			<div class="modal-header">Confirm Delete</div>
+			<div class="modal-body">
+				<p>Are you sure you want to delete user <strong>{userToDelete}</strong>?</p>
+				<p class="warning-text">⚠️ This will also remove all ACLs associated with this user.</p>
+			</div>
+			<div class="modal-actions">
+				<button class="modal-btn cancel-btn" on:click={cancelDelete}>Cancel</button>
+				<button class="modal-btn delete-btn" on:click={deleteUser} disabled={dashboardLoading}>
+					{dashboardLoading ? 'Deleting...' : 'Delete'}
+				</button>
+			</div>
+		</div>
 	</div>
 {/if}
 
@@ -312,176 +385,333 @@ function deleteAclRule(i: number) {
 	margin-bottom: 0.5rem;
 	letter-spacing: -1px;
 }
+
 .dashboard-error {
 	color: #f87171;
 	text-align: center;
 	font-size: 1.1rem;
 	margin-bottom: 1rem;
+	padding: 0.75rem;
+	background: rgba(248, 113, 113, 0.1);
+	border-radius: 0.5rem;
+	border: 1px solid rgba(248, 113, 113, 0.3);
 }
-.user-section {
+
+.user-management-container {
+	display: flex;
+	gap: 2rem;
+	align-items: flex-start;
+}
+
+/* Left side - User list section */
+.user-list-section {
+	flex: 0 0 300px;
+}
+
+.list-box {
 	background: #23283a;
 	border-radius: 1.2rem;
 	box-shadow: 0 2px 8px rgba(0,0,0,0.10);
-	padding: 2rem 2rem 1.5rem 2rem;
-	margin-bottom: 2rem;
+	overflow: hidden;
+	margin-bottom: 1rem;
 }
-.user-list-title {
+
+.list-header {
+	background: #1e293b;
+	color: #60a5fa;
 	font-size: 1.15rem;
 	font-weight: 700;
-	margin-bottom: 0.7rem;
-	color: #60a5fa;
+	padding: 1rem 1.5rem;
+	border-bottom: 1px solid #334155;
 }
-.user-list {
-	display: flex;
-	gap: 0.5rem;
-	flex-wrap: wrap;
-	margin-bottom: 1.5rem;
+
+.list-content {
+	max-height: 400px;
+	overflow-y: auto;
 }
-.user-item {
-	background: #1e293b;
-	padding: 0.5rem 1.1rem;
-	border-radius: 0.7rem;
-	margin-bottom: 0.5rem;
-	display: flex;
-	align-items: center;
-	gap: 0.5rem;
+
+.list-item {
+	padding: 0.75rem 1.5rem;
 	cursor: pointer;
 	transition: background 0.2s;
-	font-size: 1.1rem;
 	color: #e5e7eb;
-	border: 1.5px solid transparent;
+	border-bottom: 1px solid #334155;
+	font-size: 1rem;
 }
-.user-item.selected, .user-item:hover {
+
+.list-item:last-child {
+	border-bottom: none;
+}
+
+.list-item:hover {
+	background: #1e293b;
+}
+
+.list-item.selected {
 	background: #2563eb;
 	color: #fff;
-	border-color: #60a5fa;
 }
-.delete-btn {
-	background: #dc2626;
-	color: white;
-	border: none;
-	border-radius: 0.4rem;
-	padding: 0.3rem 0.8rem;
-	cursor: pointer;
-	font-size: 1rem;
-	font-weight: 600;
-	margin-left: 0.2rem;
-	transition: background 0.18s;
+
+.list-item:focus {
+	outline: 2px solid #60a5fa;
+	outline-offset: -2px;
 }
-.delete-btn:hover {
-	background: #b91c1c;
+
+.loading-item, .empty-item {
+	padding: 0.75rem 1.5rem;
+	color: #9ca3af;
+	font-style: italic;
+	text-align: center;
 }
-.add-user-form {
+
+/* Action buttons */
+.action-buttons {
 	display: flex;
 	gap: 0.5rem;
-	flex-wrap: wrap;
-	align-items: flex-end;
-	margin-bottom: 1.5rem;
 }
-.add-user-form input {
-	padding: 0.5rem 0.75rem;
-	border: 1.5px solid #334155;
-	border-radius: 0.7rem;
-	font-size: 1.1rem;
-	background: #181c24;
-	color: #e5e7eb;
-}
-.add-user-form input:focus {
-	border-color: #60a5fa;
-	background: #23283a;
-}
-.add-user-form button {
-	background: linear-gradient(90deg, #2563eb 60%, #60a5fa 100%);
-	color: white;
-	padding: 0.7rem 1.2rem;
+
+.action-btn {
+	flex: 1;
+	padding: 0.75rem 1rem;
 	border: none;
 	border-radius: 0.7rem;
-	font-size: 1.1rem;
-	font-weight: 700;
+	font-size: 1rem;
+	font-weight: 600;
 	cursor: pointer;
-	transition: background 0.2s, box-shadow 0.2s;
-	box-shadow: 0 2px 8px rgba(37,99,235,0.08);
+	transition: all 0.2s;
 }
-.user-details {
+
+.action-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.add-btn {
+	background: linear-gradient(90deg, #059669 60%, #10b981 100%);
+	color: white;
+}
+
+.add-btn:hover:not(:disabled) {
+	background: linear-gradient(90deg, #047857 60%, #059669 100%);
+	transform: translateY(-1px);
+}
+
+.edit-btn {
+	background: linear-gradient(90deg, #2563eb 60%, #60a5fa 100%);
+	color: white;
+}
+
+.edit-btn:hover:not(:disabled) {
+	background: linear-gradient(90deg, #1d4ed8 60%, #2563eb 100%);
+	transform: translateY(-1px);
+}
+
+.delete-btn {
+	background: linear-gradient(90deg, #dc2626 60%, #ef4444 100%);
+	color: white;
+}
+
+.delete-btn:hover:not(:disabled) {
+	background: linear-gradient(90deg, #b91c1c 60%, #dc2626 100%);
+	transform: translateY(-1px);
+}
+
+/* Right side - Form section */
+.form-section {
+	flex: 1;
+}
+
+.form-group-box {
 	background: #23283a;
 	border-radius: 1.2rem;
 	box-shadow: 0 2px 8px rgba(0,0,0,0.10);
-	padding: 2rem 2rem 1.5rem 2rem;
-	margin-top: 1.5rem;
+	overflow: hidden;
 }
-.user-details-title {
+
+.form-header {
+	background: #1e293b;
+	color: #60a5fa;
 	font-size: 1.15rem;
 	font-weight: 700;
-	margin-bottom: 1rem;
-	color: #60a5fa;
+	padding: 1rem 1.5rem;
+	border-bottom: 1px solid #334155;
 }
-.acl-list {
-	list-style: none;
-	padding: 0;
-	margin: 0 0 1.2rem 0;
+
+.form-content {
+	padding: 1.5rem;
 }
-.acl-rule {
-	display: flex;
-	align-items: center;
-	gap: 0.7rem;
+
+.form-placeholder {
+	color: #9ca3af;
+	text-align: center;
+	padding: 2rem;
+	font-style: italic;
+}
+
+.form-field {
+	margin-bottom: 1.5rem;
+}
+
+.form-field label {
+	display: block;
 	margin-bottom: 0.5rem;
-	font-size: 1.08rem;
-}
-.acl-action {
-	font-weight: 600;
-	color: #60a5fa;
-}
-.acl-on {
-	color: #a3a3a3;
-	font-weight: 500;
-	margin: 0 0.2rem;
-}
-.acl-topic {
-	font-family: monospace;
-	background: #181c24;
-	padding: 0.1rem 0.4rem;
-	border-radius: 0.3rem;
 	color: #e5e7eb;
+	font-weight: 600;
+	font-size: 1rem;
 }
-.edit-btn, .add-btn, .save-btn, .cancel-btn {
-	background: #2563eb;
-	color: white;
-	padding: 0.3rem 0.8rem;
+
+.form-field input {
+	width: 100%;
+	padding: 0.75rem 1rem;
+	border: 1.5px solid #334155;
+	border-radius: 0.7rem;
+	font-size: 1rem;
+	background: #181c24;
+	color: #e5e7eb;
+	transition: border-color 0.2s, background 0.2s;
+}
+
+.form-field input:focus {
+	border-color: #60a5fa;
+	background: #23283a;
+	outline: none;
+}
+
+.form-field input:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+
+.form-actions {
+	display: flex;
+	gap: 1rem;
+	margin-top: 2rem;
+}
+
+.form-btn {
+	flex: 1;
+	padding: 0.75rem 1.5rem;
 	border: none;
-	border-radius: 0.4rem;
+	border-radius: 0.7rem;
 	font-size: 1rem;
 	font-weight: 600;
 	cursor: pointer;
-	margin-left: 0.2rem;
-	transition: background 0.2s;
+	transition: all 0.2s;
 }
-.edit-btn { background: #64748b; }
-.add-btn { background: #059669; }
-.save-btn { background: #059669; }
-.save-btn.wide { width: 100%; margin-top: 1rem; }
-.cancel-btn { background: #f59e42; }
-.delete-btn { background: #dc2626; }
-.edit-btn:hover, .add-btn:hover, .save-btn:hover, .cancel-btn:hover, .delete-btn:hover {
-	filter: brightness(1.1);
+
+.form-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
 }
-input[type="text"], select {
-	padding: 0.5rem 0.75rem;
-	border: 1.5px solid #334155;
-	border-radius: 0.7rem;
-	font-size: 1.1rem;
-	margin-right: 0.2rem;
-	background: #181c24;
-	color: #e5e7eb;
+
+.save-btn {
+	background: linear-gradient(90deg, #059669 60%, #10b981 100%);
+	color: white;
 }
-input[type="text"]:focus, select:focus {
-	border-color: #60a5fa;
-	outline: none;
-	background: #23283a;
+
+.save-btn:hover:not(:disabled) {
+	background: linear-gradient(90deg, #047857 60%, #059669 100%);
+	transform: translateY(-1px);
 }
-.acl-add-form {
+
+.cancel-btn {
+	background: linear-gradient(90deg, #f59e0b 60%, #fbbf24 100%);
+	color: white;
+}
+
+.cancel-btn:hover:not(:disabled) {
+	background: linear-gradient(90deg, #d97706 60%, #f59e0b 100%);
+	transform: translateY(-1px);
+}
+
+/* Modal styles */
+.modal-overlay {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: rgba(0, 0, 0, 0.7);
 	display: flex;
 	align-items: center;
-	gap: 0.5rem;
-	margin-top: 1rem;
+	justify-content: center;
+	z-index: 1000;
+}
+
+.modal-content {
+	background: #23283a;
+	border-radius: 1.2rem;
+	box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+	max-width: 500px;
+	width: 90%;
+	margin: 1rem;
+}
+
+.modal-header {
+	background: #1e293b;
+	color: #60a5fa;
+	font-size: 1.2rem;
+	font-weight: 700;
+	padding: 1rem 1.5rem;
+	border-bottom: 1px solid #334155;
+	border-radius: 1.2rem 1.2rem 0 0;
+}
+
+.modal-body {
+	padding: 1.5rem;
+	color: #e5e7eb;
+}
+
+.modal-body p {
+	margin-bottom: 1rem;
+	line-height: 1.5;
+}
+
+.warning-text {
+	color: #fbbf24;
+	font-weight: 600;
+}
+
+.modal-actions {
+	display: flex;
+	gap: 1rem;
+	padding: 1rem 1.5rem 1.5rem;
+}
+
+.modal-btn {
+	flex: 1;
+	padding: 0.75rem 1.5rem;
+	border: none;
+	border-radius: 0.7rem;
+	font-size: 1rem;
+	font-weight: 600;
+	cursor: pointer;
+	transition: all 0.2s;
+}
+
+.modal-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+	.user-management-container {
+		flex-direction: column;
+		gap: 1rem;
+	}
+	
+	.user-list-section {
+		flex: none;
+		width: 100%;
+	}
+	
+	.action-buttons {
+		flex-direction: column;
+	}
+	
+	.form-actions {
+		flex-direction: column;
+	}
 }
 </style> 

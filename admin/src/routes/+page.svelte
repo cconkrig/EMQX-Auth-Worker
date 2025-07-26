@@ -10,7 +10,7 @@ onMount(() => {
 </script>
 
 <div class="dashboard-title">Welcome to the Admin Dashboard</div>
-<p class="dashboard-desc">Use the sidebar to manage users and ACLs for your EMQX instance.</p>
+<p class="dashboard-desc">Use the sidebar to manage users and ACLs for CARRELink.</p>
 
 <style>
 .dashboard-title {
