@@ -1,6 +1,7 @@
 <script lang="ts">
 import { page } from '$app/stores';
 import { onMount } from 'svelte';
+import { goto } from '$app/navigation';
 
 let isAuthenticated = false;
 let isLoading = true;
@@ -8,7 +9,7 @@ let isLoading = true;
 onMount(() => {
 	const token = localStorage.getItem('admin_token');
 	if (!token) {
-		window.location.href = '/admin/login';
+		goto('/admin/login');
 		return;
 	}
 	
@@ -20,11 +21,11 @@ onMount(() => {
 			isAuthenticated = true;
 		} else {
 			localStorage.removeItem('admin_token');
-			window.location.href = '/admin/login';
+			goto('/admin/login');
 		}
 	}).catch(() => {
 		localStorage.removeItem('admin_token');
-		window.location.href = '/admin/login';
+		goto('/admin/login');
 	}).finally(() => {
 		isLoading = false;
 	});
@@ -32,7 +33,7 @@ onMount(() => {
 
 function logout() {
 	localStorage.removeItem('admin_token');
-	window.location.href = '/admin/login';
+	goto('/admin/login');
 }
 </script>
 

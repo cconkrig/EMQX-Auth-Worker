@@ -1,5 +1,6 @@
 <script lang="ts">
 import { onMount } from 'svelte';
+import { goto } from '$app/navigation';
 
 let username = '';
 let password = '';
@@ -66,7 +67,7 @@ async function handleSubmit() {
 			const data = await res.json();
 			if (res.ok) {
 				localStorage.setItem('admin_token', data.token);
-				window.location.href = '/admin/';
+				goto('/admin/');
 			} else {
 				error = data.error || 'Login failed';
 			}
