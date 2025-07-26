@@ -246,7 +246,7 @@ function logout(reason = 'User logged out') {
 	gap: 0.5rem;
 }
 .sidebar-nav li {
-	padding: 0.7rem 1rem;
+	padding: 0;
 	border-radius: 0.4rem;
 	font-size: 1rem;
 	font-weight: 500;
@@ -259,6 +259,9 @@ function logout(reason = 'User logged out') {
 	text-decoration: none;
 	display: block;
 	width: 100%;
+	padding: 0.7rem 1rem;
+	border-radius: 0.4rem;
+	transition: background 0.15s, color 0.15s;
 }
 .sidebar-nav li a.active, .sidebar-nav li a:hover {
 	background: #404040;
