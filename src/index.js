@@ -711,15 +711,15 @@ async function handleAdminApi(request, env) {
         console.log(`[SECURITY] Failed login attempt - user not found: ${sanitizedUsername} from IP ${ip}`);
         return jsonResponse({ error: "Invalid credentials" }, 401, origin);
       }
-      let admin;
+      let adminRecord;
       try {
-        admin = JSON.parse(adminRaw);
+        adminRecord = JSON.parse(adminRaw);
       } catch {
         incrementAdminLoginAttempts(ip, sanitizedUsername);
         console.log(`[SECURITY] Failed login attempt - corrupt data: ${sanitizedUsername} from IP ${ip}`);
         return jsonResponse({ error: "Corrupt admin data" }, 500, origin);
       }
-      const ok = await bcrypt.compare(sanitizedPassword, admin.password_hash);
+      const ok = await bcrypt.compare(sanitizedPassword, adminRecord.password_hash);
       if (!ok) {
         incrementAdminLoginAttempts(ip, sanitizedUsername);
         console.log(`[SECURITY] Failed login attempt - invalid password: ${sanitizedUsername} from IP ${ip}`);
@@ -781,7 +781,7 @@ async function handleAdminApi(request, env) {
     const secret = new TextEncoder().encode(env.JWT_SECRET);
     const token = await new SignJWT({ 
       username, 
-      roles: admin.roles || [],
+      roles: adminRecord.roles || [],
       sessionId,
       exp: Math.floor(tokenExpiry / 1000)
     })
@@ -798,7 +798,8 @@ async function handleAdminApi(request, env) {
   } catch (e) {
     return jsonResponse({ error: e.message || 'Error during login' }, 500, origin);
   }
-
+  }
+  
   let admin;
   try {
     admin = await requireAdmin(request, env);
@@ -1197,7 +1198,6 @@ async function handleAdminApi(request, env) {
   const corsHeaders = getCorsHeaders(origin);
   return new Response("Not found", { status: 404, headers: corsHeaders });
 }
-}
 
 export default {
   async fetch(request, env, ctx) {
@@ -1444,7 +1444,7 @@ function topicMatches(pattern, topic) {
       if (topicParts.length <= i) return false;
       continue;
     }
-    if (topicParts[i] !== patternParts[i]) return false;
+    if (patternParts[i] !== topicParts[i]) return false;
   }
   return i === topicParts.length;
-} 
+}
