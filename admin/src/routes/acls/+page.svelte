@@ -331,13 +331,14 @@ function getCallLettersFromTopic(topic: string): { callLetters: string; frequenc
 								<input 
 									id="callLetters"
 									type="text" 
-									bind:value={newPermission.callLetters}
+									value={newPermission.callLetters}
 									disabled={saveProgress.active}
 									placeholder="Enter call letters"
 									on:keydown={(e) => e.key === 'Enter' && addPermission()}
 									on:input={(e) => {
 										// Force uppercase conversion
-										newPermission.callLetters = newPermission.callLetters.toUpperCase();
+										const target = e.target as HTMLInputElement;
+										newPermission.callLetters = target.value.toUpperCase();
 									}}
 								/>
 								<select 
