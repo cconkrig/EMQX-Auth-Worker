@@ -19,6 +19,25 @@ const config = {
 		}),
 		paths: {
 			base: '/admin'
+		},
+		csp: {
+			mode: 'hash',
+			directives: {
+				'script-src': ['self', 'unsafe-inline', 'unsafe-eval'],
+				'style-src': ['self', 'unsafe-inline'],
+				'img-src': ['self', 'data:', 'blob:'],
+				'font-src': ['self', 'data:'],
+				'connect-src': ['self'],
+				'frame-ancestors': ['none'],
+				'base-uri': ['self'],
+				'form-action': ['self'],
+				'frame-src': ['none'],
+				'object-src': ['none'],
+				'media-src': ['none'],
+				'manifest-src': ['self'],
+				'worker-src': ['self'],
+				'child-src': ['none']
+			}
 		}
 	}
 };

@@ -50,18 +50,12 @@ function audit(adminUsername, action, target) {
   console.log(`[AUDIT] admin=${adminUsername} action=${action} target=${target || ''}`);
 }
 
-// Generate CSP nonce function
-function generateCspNonce() {
-  return crypto.randomUUID().replace(/-/g, '');
-}
-
-// Get admin headers with dynamic CSP nonce
+// Get admin headers with CSP for static builds
 function getAdminHeaders() {
-  const cspNonce = generateCspNonce();
   return {
     "Content-Security-Policy": [
       "default-src 'self'",
-      "script-src 'self' 'nonce-" + cspNonce + "' 'strict-dynamic'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:",
       "font-src 'self' data:",
