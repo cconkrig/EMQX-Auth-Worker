@@ -232,6 +232,22 @@ async function handleAdminApi(request, env) {
       return jsonResponse({ error: e.message || 'Error updating ACLs' }, 500);
     }
   }
+  if (url.pathname === "/admin/api/user-acls" && request.method === "PUT") {
+    try {
+      const { username, acls } = await request.json();
+      if (!username || !Array.isArray(acls)) return jsonResponse({ error: "Missing username or acls" }, 400);
+      const userRaw = await env.USERS.get(`user:${username}`);
+      if (!userRaw) return jsonResponse({ error: "User not found" }, 404);
+      let user;
+      try { user = JSON.parse(userRaw); } catch { return jsonResponse({ error: "Corrupt user data" }, 500); }
+      user.acls = acls;
+      await env.USERS.put(`user:${username}`, JSON.stringify(user));
+      audit('update_acls', username);
+      return jsonResponse({ success: true });
+    } catch (e) {
+      return jsonResponse({ error: e.message || 'Error updating ACLs' }, 500);
+    }
+  }
   if (url.pathname === "/admin/api/users" && request.method === "GET") {
     try {
       const list = await env.USERS.list({ prefix: "user:" });
