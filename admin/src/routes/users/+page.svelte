@@ -275,8 +275,10 @@ function confirmDeleteUser(user: string) {
 		dashboardError = 'Cannot delete user: invalid user selection';
 		return;
 	}
+	console.log('Confirming delete for user:', user);
 	userToDelete = user;
 	showDeleteConfirm = true;
+	console.log('userToDelete set to:', userToDelete);
 }
 
 async function deleteUser() {
@@ -285,6 +287,10 @@ async function deleteUser() {
 		dashboardError = 'Cannot delete user: no user selected';
 		return;
 	}
+	
+	// Capture the username immediately to avoid closure issues
+	const usernameToDelete = userToDelete;
+	console.log('Starting delete process for user:', usernameToDelete);
 	
 	// Start delete progress
 	deleteProgress = {
@@ -308,14 +314,14 @@ async function deleteUser() {
 				(window as any).resetSessionTimeout();
 			}
 			
-			console.log('Deleting user:', userToDelete);
+			console.log('Deleting user:', usernameToDelete);
 			const res = await fetch('/admin/api/user', {
 				method: 'DELETE',
 				headers: {
 					'Content-Type': 'application/json',
 					Authorization: `Bearer ${token}`
 				},
-				body: JSON.stringify({ username: userToDelete })
+				body: JSON.stringify({ username: usernameToDelete })
 			});
 			
 			if (!res.ok) {
@@ -328,7 +334,7 @@ async function deleteUser() {
 			// Implement retry mechanism to confirm user is removed from list
 			const retryDelay = 5000; // 5 seconds as requested
 			
-			while (deleteProgress.retryCount < deleteProgress.maxRetries && users.includes(userToDelete!)) {
+			while (deleteProgress.retryCount < deleteProgress.maxRetries && users.includes(usernameToDelete)) {
 				deleteProgress.retryCount++;
 				deleteProgress.message = `Deleting user... this may take a moment while it propagates to the network... (Attempt ${deleteProgress.retryCount}/${deleteProgress.maxRetries})`;
 				
@@ -337,14 +343,14 @@ async function deleteUser() {
 				await loadUsers();
 			}
 			
-			if (users.includes(userToDelete!)) {
+			if (users.includes(usernameToDelete)) {
 				console.warn('User still found in list after all retries, but operation was successful');
 			} else {
 				console.log('User confirmed removed from list after retry');
 			}
 			
 			// Clean up selection if deleted user was selected
-			if (selectedUser === userToDelete) {
+			if (selectedUser === usernameToDelete) {
 				selectedUser = null;
 				formMode = 'none';
 				formEnabled = false;
