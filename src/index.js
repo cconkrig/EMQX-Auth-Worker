@@ -478,6 +478,8 @@ async function requireAdmin(request, env) {
       return null;
     }
     
+    console.log('JWT_SECRET is set, length:', env.JWT_SECRET.length);
+    
     const secret = new TextEncoder().encode(env.JWT_SECRET);
     const { payload } = await jwtVerify(token, secret);
     
