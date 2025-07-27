@@ -8,13 +8,25 @@ function getCorsHeaders(origin) {
     'https://msgwrk-qt4g0063hh.cyber-comp.cc'
   ];
   
+  // STRICT: Require origin header and validate it
+  if (!origin) {
+    // No origin header - block the request
+    return {
+      "Access-Control-Allow-Origin": "",
+      "Access-Control-Allow-Methods": "",
+      "Access-Control-Allow-Headers": "",
+      "X-Content-Type-Options": "nosniff",
+      "Referrer-Policy": "no-referrer",
+    };
+  }
+  
   // Check if origin is allowed
   const isAllowed = allowedOrigins.includes(origin);
   
   return {
     "Access-Control-Allow-Origin": isAllowed ? origin : "",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Allow-Methods": isAllowed ? "POST, OPTIONS" : "",
+    "Access-Control-Allow-Headers": isAllowed ? "Content-Type, Authorization" : "",
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "no-referrer",
   };
@@ -132,6 +144,19 @@ async function requireAdmin(request, env) {
 async function handleAdminApi(request, env) {
   const url = new URL(request.url);
   const origin = request.headers.get("Origin");
+
+  // SECURITY: Block requests without valid origin header
+  const allowedOrigins = ['https://msgwrk-qt4g0063hh.cyber-comp.cc'];
+  if (!origin || !allowedOrigins.includes(origin)) {
+    return new Response("Forbidden", { 
+      status: 403,
+      headers: {
+        "Content-Type": "text/plain",
+        "X-Content-Type-Options": "nosniff",
+        "Referrer-Policy": "no-referrer",
+      }
+    });
+  }
 
   // Bootstrap endpoint - creates first admin user if none exists
   if (url.pathname === "/admin/api/bootstrap" && request.method === "POST") {
@@ -390,8 +415,9 @@ export default {
     }
 
     try {
+      const origin = request.headers.get("Origin");
+
       if (url.pathname === "/auth" && request.method === "POST") {
-        const origin = request.headers.get("Origin");
         if (isRateLimited(ip)) {
           return jsonResponse({ result: "deny", reason: "Rate limit exceeded" }, 429, origin);
         }
@@ -437,7 +463,6 @@ export default {
       }
 
       if (url.pathname === "/acl" && request.method === "POST") {
-        const origin = request.headers.get("Origin");
         if (isRateLimited(ip)) {
           return jsonResponse({ result: "deny", reason: "Rate limit exceeded" }, 429, origin);
         }
@@ -480,13 +505,11 @@ export default {
         return jsonResponse({ result: allowed ? "allow" : "deny" }, 200, origin);
       }
 
-      const origin = request.headers.get("Origin");
       const corsHeaders = getCorsHeaders(origin);
       return new Response("Not found", { status: 404, headers: corsHeaders });
     } catch (err) {
       log("Internal error", err);
       incrementRateLimit(ip);
-      const origin = request.headers.get("Origin");
       return jsonResponse({ result: "deny" }, 500, origin);
     }
   },
