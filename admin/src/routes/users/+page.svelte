@@ -22,7 +22,7 @@ let saveProgress = {
 	active: false,
 	message: '',
 	retryCount: 0,
-	maxRetries: 5
+	maxRetries: 18 // 90 seconds total (18 * 5 seconds)
 };
 
 // Delete progress state
@@ -30,8 +30,54 @@ let deleteProgress = {
 	active: false,
 	message: '',
 	retryCount: 0,
-	maxRetries: 5
+	maxRetries: 18 // 90 seconds total (18 * 5 seconds)
 };
+
+// Client-side validation functions
+function validateUsername(username: string): { valid: boolean; error?: string } {
+  if (!username) {
+    return { valid: false, error: 'Username is required' };
+  }
+  if (username.length < 3) {
+    return { valid: false, error: 'Username must be at least 3 characters' };
+  }
+  if (username.length > 64) {
+    return { valid: false, error: 'Username must be 64 characters or less' };
+  }
+  if (!/^[A-Za-z0-9_\-]+$/.test(username)) {
+    return { valid: false, error: 'Username can only contain letters, numbers, underscores, and hyphens' };
+  }
+  return { valid: true };
+}
+
+function validatePassword(password: string): { valid: boolean; error?: string } {
+  if (!password) {
+    return { valid: false, error: 'Password is required' };
+  }
+  if (password.length < 8) {
+    return { valid: false, error: 'Password must be at least 8 characters' };
+  }
+  if (password.length > 128) {
+    return { valid: false, error: 'Password must be 128 characters or less' };
+  }
+  return { valid: true };
+}
+
+function validateForm(): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+  
+  const usernameValidation = validateUsername(formData.username);
+  if (!usernameValidation.valid) {
+    errors.push(usernameValidation.error!);
+  }
+  
+  const passwordValidation = validatePassword(formData.password);
+  if (!passwordValidation.valid) {
+    errors.push(passwordValidation.error!);
+  }
+  
+  return { valid: errors.length === 0, errors };
+}
 
 function getToken() {
 	return localStorage.getItem('admin_token');
@@ -131,8 +177,13 @@ function cancelForm() {
 }
 
 async function saveUser() {
-	if (!formData.username || !formData.password) {
-		dashboardError = 'Username and password required';
+	// Clear previous errors
+	dashboardError = '';
+	
+	// Client-side validation
+	const validation = validateForm();
+	if (!validation.valid) {
+		dashboardError = validation.errors.join(', ');
 		return;
 	}
 	
@@ -478,7 +529,11 @@ function cancelDelete() {
 							bind:value={formData.username}
 							disabled={!formEnabled || saveProgress.active || deleteProgress.active}
 							placeholder="Enter username"
+							class={formData.username && !validateUsername(formData.username).valid ? 'error' : ''}
 						/>
+						{#if formData.username && !validateUsername(formData.username).valid}
+							<div class="field-error">{validateUsername(formData.username).error}</div>
+						{/if}
 					</div>
 					
 					<div class="form-field">
@@ -489,7 +544,11 @@ function cancelDelete() {
 							bind:value={formData.password}
 							disabled={!formEnabled || saveProgress.active || deleteProgress.active}
 							placeholder="Enter password"
+							class={formData.password && !validatePassword(formData.password).valid ? 'error' : ''}
 						/>
+						{#if formData.password && !validatePassword(formData.password).valid}
+							<div class="field-error">{validatePassword(formData.password).error}</div>
+						{/if}
 					</div>
 					
 					<div class="form-actions">
@@ -903,11 +962,11 @@ function cancelDelete() {
 
 /* Delete Progress styles */
 .delete-progress {
-	background: #dc2626;
+	background: #1e40af;
 	border-radius: 0.4rem;
 	padding: 1rem;
 	margin-bottom: 1rem;
-	border: 1px solid #ef4444;
+	border: 1px solid #3b82f6;
 }
 
 .delete-progress .progress-message {
@@ -942,6 +1001,23 @@ function cancelDelete() {
 .action-btn:disabled {
 	opacity: 0.5;
 	cursor: not-allowed;
+}
+
+/* Validation styles */
+.field-error {
+	color: #dc2626;
+	font-size: 0.875rem;
+	margin-top: 0.25rem;
+}
+
+input.error {
+	border-color: #dc2626;
+	background-color: #fef2f2;
+}
+
+input.error:focus {
+	border-color: #dc2626;
+	box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
 }
 
 /* Responsive design */

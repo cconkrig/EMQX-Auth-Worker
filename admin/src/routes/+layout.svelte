@@ -9,11 +9,15 @@ let mounted = false;
 
 // Session timeout management
 let sessionTimeoutId: number | null = null;
-const SESSION_TIMEOUT = 15 * 60 * 1000; // 15 minutes in milliseconds
+let sessionRefreshId: number | null = null;
+const SESSION_TIMEOUT = 25 * 60 * 1000; // 25 minutes in milliseconds (5 minutes before session expiry)
+const SESSION_REFRESH_INTERVAL = 20 * 60 * 1000; // 20 minutes in milliseconds (10 minutes before token expiry)
+let sessionInfo: any = null;
 
 // Expose resetSessionTimeout function globally for child components
 if (typeof window !== 'undefined') {
 	(window as any).resetSessionTimeout = resetSessionTimeout;
+	(window as any).getSessionInfo = getSessionInfo;
 }
 
 // Reactive statement to handle authentication when pathname changes
@@ -38,23 +42,30 @@ onMount(() => {
 });
 
 onDestroy(() => {
-	// Clean up timeout when component is destroyed
+	// Clean up timeouts when component is destroyed
 	if (sessionTimeoutId) {
 		clearTimeout(sessionTimeoutId);
+	}
+	if (sessionRefreshId) {
+		clearInterval(sessionRefreshId);
 	}
 	
 	// Remove event listeners
 	removeActivityListeners();
 	
-	// Clean up global function
+	// Clean up global functions
 	if (typeof window !== 'undefined') {
 		delete (window as any).resetSessionTimeout;
+		delete (window as any).getSessionInfo;
 	}
 });
 
 function setupSessionTimeout() {
 	// Reset the session timeout
 	resetSessionTimeout();
+	
+	// Set up session refresh
+	setupSessionRefresh();
 	
 	// Add event listeners for user activity
 	addActivityListeners();
@@ -104,6 +115,61 @@ function removeActivityListeners() {
 	});
 }
 
+async function getSessionInfo() {
+	const token = localStorage.getItem('admin_token');
+	if (!token) return null;
+	
+	try {
+		const res = await fetch('/admin/api/session/info', {
+			headers: { Authorization: `Bearer ${token}` }
+		});
+		if (res.ok) {
+			sessionInfo = await res.json();
+			return sessionInfo;
+		}
+	} catch (e) {
+		console.error('Error fetching session info:', e);
+	}
+	return null;
+}
+
+async function refreshSession() {
+	const token = localStorage.getItem('admin_token');
+	if (!token) return false;
+	
+	try {
+		const res = await fetch('/admin/api/session/refresh', {
+			method: 'POST',
+			headers: { Authorization: `Bearer ${token}` }
+		});
+		if (res.ok) {
+			const data = await res.json();
+			localStorage.setItem('admin_token', data.token);
+			console.log('Session refreshed successfully');
+			return true;
+		}
+	} catch (e) {
+		console.error('Error refreshing session:', e);
+	}
+	return false;
+}
+
+function setupSessionRefresh() {
+	// Clear existing refresh interval
+	if (sessionRefreshId) {
+		clearInterval(sessionRefreshId);
+	}
+	
+	// Set up automatic session refresh
+	sessionRefreshId = setInterval(async () => {
+		const success = await refreshSession();
+		if (!success) {
+			console.log('Session refresh failed, logging out');
+			logout('Session refresh failed');
+		}
+	}, SESSION_REFRESH_INTERVAL);
+}
+
 function checkAuthentication() {
 	const token = localStorage.getItem('admin_token');
 	console.log('Checking authentication with token:', token ? token.substring(0, 20) + '...' : 'null');
@@ -133,6 +199,8 @@ function checkAuthentication() {
 			isAuthenticated = true;
 			// Reset session timeout when authentication is successful
 			resetSessionTimeout();
+			// Get session info
+			getSessionInfo();
 		} else {
 			console.log('Authentication failed, redirecting to login');
 			localStorage.removeItem('admin_token');
@@ -148,15 +216,32 @@ function checkAuthentication() {
 	});
 }
 
-function logout(reason = 'User logged out') {
-	// Clean up session timeout
+async function logout(reason = 'User logged out') {
+	// Clean up session timeouts
 	if (sessionTimeoutId) {
 		clearTimeout(sessionTimeoutId);
 		sessionTimeoutId = null;
 	}
+	if (sessionRefreshId) {
+		clearInterval(sessionRefreshId);
+		sessionRefreshId = null;
+	}
 	
 	// Remove activity listeners
 	removeActivityListeners();
+	
+	// Call logout endpoint to clean up server-side session
+	const token = localStorage.getItem('admin_token');
+	if (token) {
+		try {
+			await fetch('/admin/api/session/logout', {
+				method: 'POST',
+				headers: { Authorization: `Bearer ${token}` }
+			});
+		} catch (e) {
+			console.error('Error calling logout endpoint:', e);
+		}
+	}
 	
 	// Clear token and redirect
 	localStorage.removeItem('admin_token');

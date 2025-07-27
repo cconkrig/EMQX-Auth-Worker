@@ -10,6 +10,52 @@ let isBootstrapMode = false;
 let bootstrapMessage = '';
 let mounted = false;
 
+// Client-side validation functions
+function validateUsername(username: string): { valid: boolean; error?: string } {
+	if (!username) {
+		return { valid: false, error: 'Username is required' };
+	}
+	if (username.length < 3) {
+		return { valid: false, error: 'Username must be at least 3 characters' };
+	}
+	if (username.length > 64) {
+		return { valid: false, error: 'Username must be 64 characters or less' };
+	}
+	if (!/^[A-Za-z0-9_\-]+$/.test(username)) {
+		return { valid: false, error: 'Username can only contain letters, numbers, underscores, and hyphens' };
+	}
+	return { valid: true };
+}
+
+function validatePassword(password: string): { valid: boolean; error?: string } {
+	if (!password) {
+		return { valid: false, error: 'Password is required' };
+	}
+	if (password.length < 8) {
+		return { valid: false, error: 'Password must be at least 8 characters' };
+	}
+	if (password.length > 128) {
+		return { valid: false, error: 'Password must be 128 characters or less' };
+	}
+	return { valid: true };
+}
+
+function validateForm(): { valid: boolean; errors: string[] } {
+	const errors: string[] = [];
+	
+	const usernameValidation = validateUsername(username);
+	if (!usernameValidation.valid) {
+		errors.push(usernameValidation.error!);
+	}
+	
+	const passwordValidation = validatePassword(password);
+	if (!passwordValidation.valid) {
+		errors.push(passwordValidation.error!);
+	}
+	
+	return { valid: errors.length === 0, errors };
+}
+
 onMount(async () => {
 	mounted = true;
 	
@@ -41,6 +87,14 @@ async function handleSubmit() {
 	error = '';
 	loading = true;
 	
+	// Client-side validation
+	const validation = validateForm();
+	if (!validation.valid) {
+		error = validation.errors.join(', ');
+		loading = false;
+		return;
+	}
+	
 	try {
 		if (isBootstrapMode) {
 			// Create first admin user
@@ -70,6 +124,10 @@ async function handleSubmit() {
 			const data = await res.json();
 			if (res.ok) {
 				localStorage.setItem('admin_token', data.token);
+				// Store session info for reference
+				if (data.sessionId) {
+					localStorage.setItem('session_id', data.sessionId);
+				}
 				goto('/admin/');
 			} else {
 				error = data.error || 'Login failed';
@@ -115,7 +173,11 @@ async function handleSubmit() {
 						placeholder="Enter username"
 						disabled={loading}
 						autocomplete="username"
+						class={username && !validateUsername(username).valid ? 'error' : ''}
 					/>
+					{#if username && !validateUsername(username).valid}
+						<div class="field-error">{validateUsername(username).error}</div>
+					{/if}
 				</div>
 
 				<div class="form-group">
@@ -129,7 +191,11 @@ async function handleSubmit() {
 						placeholder="Enter password"
 						disabled={loading}
 						autocomplete="current-password"
+						class={password && !validatePassword(password).valid ? 'error' : ''}
 					/>
+					{#if password && !validatePassword(password).valid}
+						<div class="field-error">{validatePassword(password).error}</div>
+					{/if}
 				</div>
 
 				<button type="submit" disabled={loading} class="login-button">
@@ -267,5 +333,21 @@ async function handleSubmit() {
 .login-button:disabled {
 	opacity: 0.6;
 	cursor: not-allowed;
+}
+
+.field-error {
+	color: #dc2626;
+	font-size: 0.875rem;
+	margin-top: 0.25rem;
+}
+
+input.error {
+	border-color: #dc2626;
+	background-color: #fef2f2;
+}
+
+input.error:focus {
+	border-color: #dc2626;
+	box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
 }
 </style> 
