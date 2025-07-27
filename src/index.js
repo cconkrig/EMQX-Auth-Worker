@@ -1102,19 +1102,8 @@ async function handleAdminApi(request, env) {
   
   if (url.pathname === "/admin/api/session/info" && request.method === "GET") {
     try {
-      // Debug: Log admin object
-      console.log('Session info - admin object:', admin);
-      
-      if (!admin) {
-        return jsonResponse({ error: "Admin authentication failed" }, 401, origin);
-      }
-      
       if (!admin.sessionId) {
         return jsonResponse({ error: "No active session" }, 400, origin);
-      }
-      
-      if (!admin.username) {
-        return jsonResponse({ error: "No username in admin object" }, 400, origin);
       }
       
       const sessionRaw = await env.USERS.get(`session:${admin.sessionId}`);
@@ -1154,7 +1143,6 @@ async function handleAdminApi(request, env) {
         maxSessions: 3
       }, 200, origin);
     } catch (e) {
-      console.error('Session info error:', e);
       return jsonResponse({ error: e.message || 'Error fetching session info' }, 500, origin);
     }
   }
