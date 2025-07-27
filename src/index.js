@@ -1197,6 +1197,7 @@ async function handleAdminApi(request, env) {
   const corsHeaders = getCorsHeaders(origin);
   return new Response("Not found", { status: 404, headers: corsHeaders });
 }
+}
 
 export default {
   async fetch(request, env, ctx) {
