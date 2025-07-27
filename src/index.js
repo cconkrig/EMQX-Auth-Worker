@@ -467,27 +467,45 @@ function getJwtFromRequest(request) {
 
 async function requireAdmin(request, env) {
   const token = getJwtFromRequest(request);
-  if (!token) return null;
+  if (!token) {
+    console.log('[AUTH] No token provided');
+    return null;
+  }
   
   try {
-    if (!env.JWT_SECRET) return null;
+    if (!env.JWT_SECRET) {
+      console.log('[AUTH] No JWT_SECRET configured');
+      return null;
+    }
     
     const secret = new TextEncoder().encode(env.JWT_SECRET);
-    const { payload } = await jwtVerify(token, secret);
+    let payload;
+    try {
+      const result = await jwtVerify(token, secret);
+      payload = result.payload;
+    } catch (jwtError) {
+      console.log('[AUTH] JWT verification failed:', jwtError.message);
+      return null;
+    }
     
-    if (!payload.roles || !payload.roles.includes("admin")) return null;
+    if (!payload.roles || !payload.roles.includes("admin")) {
+      console.log('[AUTH] User does not have admin role');
+      return null;
+    }
     
     // Validate session if sessionId is present
     if (payload.sessionId) {
       const sessionRaw = await env.USERS.get(`session:${payload.sessionId}`);
       if (!sessionRaw) {
+        console.log('[AUTH] Session not found:', payload.sessionId);
         return null; // Session not found or expired
       }
       
       let sessionData;
       try {
         sessionData = JSON.parse(sessionRaw);
-      } catch {
+      } catch (e) {
+        console.log('[AUTH] Corrupt session data:', e.message);
         return null; // Corrupt session data
       }
       
@@ -495,6 +513,7 @@ async function requireAdmin(request, env) {
       
       // Check if session has expired
       if (now > sessionData.expiresAt) {
+        console.log('[AUTH] Session expired:', payload.sessionId);
         // Clean up expired session
         await env.USERS.delete(`session:${payload.sessionId}`);
         return null;
@@ -519,14 +538,17 @@ async function requireAdmin(request, env) {
               expirationTtl: 3600 // 1 hour TTL
             });
           }
-        } catch {
+        } catch (e) {
+          console.log('[AUTH] Error updating session list:', e.message);
           // Ignore errors updating session list
         }
       }
     }
     
+    console.log('[AUTH] Admin authentication successful for:', payload.username);
     return payload;
-  } catch {
+  } catch (e) {
+    console.log('[AUTH] Authentication error:', e.message);
     return null;
   }
 }
@@ -777,8 +799,18 @@ async function handleAdminApi(request, env) {
     return jsonResponse({ error: e.message || 'Error during login' }, 500, origin);
   }
 
-  const admin = await requireAdmin(request, env);
-  if (!admin) return jsonResponse({ error: "Unauthorized" }, 401, origin);
+  let admin;
+  try {
+    admin = await requireAdmin(request, env);
+  } catch (authError) {
+    console.log('[ADMIN_API] Authentication error:', authError.message);
+    return jsonResponse({ error: "Authentication error" }, 500, origin);
+  }
+  
+  if (!admin) {
+    console.log('[ADMIN_API] Authentication failed for:', url.pathname);
+    return jsonResponse({ error: "Unauthorized" }, 401, origin);
+  }
 
   // Rate limiting for admin API endpoints (excluding login and bootstrap)
   if (isAdminApiRateLimited(ip)) {
@@ -1164,7 +1196,7 @@ async function handleAdminApi(request, env) {
   
   const corsHeaders = getCorsHeaders(origin);
   return new Response("Not found", { status: 404, headers: corsHeaders });
-}}
+}
 
 export default {
   async fetch(request, env, ctx) {
