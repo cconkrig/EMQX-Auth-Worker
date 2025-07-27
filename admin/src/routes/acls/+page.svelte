@@ -312,8 +312,9 @@ function getCallLettersFromTopic(topic: string): { callLetters: string; frequenc
 				{:else}
 					<!-- Username display -->
 					<div class="form-field">
-						<label>Username</label>
+						<label for="username-display">Username</label>
 						<input 
+							id="username-display"
 							type="text" 
 							value={selectedUser}
 							disabled={true}
@@ -352,25 +353,27 @@ function getCallLettersFromTopic(topic: string): { callLetters: string; frequenc
 						</div>
 						
 						<div class="form-field">
-							<label>Permission</label>
-							<div class="checkbox-group">
-								<label class="checkbox-label">
-									<input 
-										type="checkbox" 
-										bind:checked={newPermission.canReceive}
-										disabled={saveProgress.active}
-									/>
-									Receive
-								</label>
-								<label class="checkbox-label">
-									<input 
-										type="checkbox" 
-										bind:checked={newPermission.canSend}
-										disabled={saveProgress.active}
-									/>
-									Send
-								</label>
-							</div>
+							<fieldset>
+								<legend>Permission</legend>
+								<div class="checkbox-group">
+									<label class="checkbox-label">
+										<input 
+											type="checkbox" 
+											bind:checked={newPermission.canReceive}
+											disabled={saveProgress.active}
+										/>
+										Receive
+									</label>
+									<label class="checkbox-label">
+										<input 
+											type="checkbox" 
+											bind:checked={newPermission.canSend}
+											disabled={saveProgress.active}
+										/>
+										Send
+									</label>
+								</div>
+							</fieldset>
 						</div>
 						
 						<button 
@@ -828,8 +831,7 @@ function getCallLettersFromTopic(topic: string): { callLetters: string; frequenc
 	pointer-events: none;
 }
 
-.form-content.disabled .form-field input,
-.form-content.disabled .form-actions button {
+.form-content.disabled .form-field input {
 	cursor: not-allowed;
 }
 

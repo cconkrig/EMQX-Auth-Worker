@@ -3,8 +3,12 @@ import path from 'path';
 
 // Copy static assets from admin/static to public/admin
 function copyAssets() {
-    const src = 'admin/static';
-    const dest = 'public/admin';
+    // Handle running from different directories
+    const cwd = process.cwd();
+    const isInAdminDir = cwd.endsWith('admin');
+    
+    const src = isInAdminDir ? 'static' : 'admin/static';
+    const dest = isInAdminDir ? '../public/admin' : 'public/admin';
     
     if (!fs.existsSync(dest)) {
         fs.mkdirSync(dest, { recursive: true });
