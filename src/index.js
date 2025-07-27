@@ -277,11 +277,20 @@ export default {
     ) {
       console.log(`[ADMIN] Serving admin UI for path: ${url.pathname}`);
       
-      // For SPA routing, try to serve the specific file first, then fallback to index.html
+      // Try to serve the specific file first
       let response = await env.ASSETS.fetch(request);
       console.log(`[ADMIN] Initial response status: ${response.status}`);
       
-      // If the file doesn't exist (404), serve index.html for SPA routing
+      // If the file exists and is not an HTML file, serve it directly
+      if (response.status === 200) {
+        const contentType = response.headers.get('content-type');
+        if (contentType && !contentType.includes('text/html')) {
+          console.log(`[ADMIN] Serving static file: ${url.pathname}, content-type: ${contentType}`);
+          return response;
+        }
+      }
+      
+      // If the file doesn't exist (404) or is HTML, serve index.html for SPA routing
       if (response.status === 404) {
         console.log(`[ADMIN] File not found, serving index.html for SPA routing`);
         const indexRequest = new Request(new URL('/admin/index.html', request.url), {
