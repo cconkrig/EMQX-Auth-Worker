@@ -59,28 +59,9 @@ function validateForm(): { valid: boolean; errors: string[] } {
 onMount(async () => {
 	mounted = true;
 	
-	// Check if we're in bootstrap mode (no admin users exist)
-	try {
-		const res = await fetch('/admin/api/bootstrap', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ username: 'test', password: 'test' })
-		});
-		
-		if (res.status === 400) {
-			const data = await res.json();
-			if (data.error === 'Not Allowed') {
-				isBootstrapMode = false;
-			} else {
-				isBootstrapMode = true;
-			}
-		} else {
-			isBootstrapMode = true;
-		}
-	} catch (e) {
-		// If we can't reach the bootstrap endpoint, assume normal login mode
-		isBootstrapMode = false;
-	}
+	// Assume normal login mode by default
+	// Bootstrap mode will be detected if login fails with specific error
+	isBootstrapMode = false;
 });
 
 async function handleSubmit() {
@@ -130,7 +111,13 @@ async function handleSubmit() {
 				}
 				goto('/admin/');
 			} else {
-				error = data.error || 'Login failed';
+				// Check if this is a bootstrap mode error
+				if (data.error === 'No admin users exist' || data.error === 'Bootstrap mode required') {
+					isBootstrapMode = true;
+					error = 'No admin users exist. Please create the first admin account.';
+				} else {
+					error = data.error || 'Login failed';
+				}
 			}
 		}
 	} catch (e: any) {
@@ -173,11 +160,7 @@ async function handleSubmit() {
 						placeholder="Enter username"
 						disabled={loading}
 						autocomplete="username"
-						class={username && !validateUsername(username).valid ? 'error' : ''}
 					/>
-					{#if username && !validateUsername(username).valid}
-						<div class="field-error">{validateUsername(username).error}</div>
-					{/if}
 				</div>
 
 				<div class="form-group">
@@ -191,11 +174,7 @@ async function handleSubmit() {
 						placeholder="Enter password"
 						disabled={loading}
 						autocomplete="current-password"
-						class={password && !validatePassword(password).valid ? 'error' : ''}
 					/>
-					{#if password && !validatePassword(password).valid}
-						<div class="field-error">{validatePassword(password).error}</div>
-					{/if}
 				</div>
 
 				<button type="submit" disabled={loading} class="login-button">
@@ -335,19 +314,5 @@ async function handleSubmit() {
 	cursor: not-allowed;
 }
 
-.field-error {
-	color: #dc2626;
-	font-size: 0.875rem;
-	margin-top: 0.25rem;
-}
 
-input.error {
-	border-color: #dc2626;
-	background-color: #fef2f2;
-}
-
-input.error:focus {
-	border-color: #dc2626;
-	box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
-}
 </style> 

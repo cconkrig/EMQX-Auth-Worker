@@ -529,11 +529,7 @@ function cancelDelete() {
 							bind:value={formData.username}
 							disabled={!formEnabled || saveProgress.active || deleteProgress.active}
 							placeholder="Enter username"
-							class={formData.username && !validateUsername(formData.username).valid ? 'error' : ''}
 						/>
-						{#if formData.username && !validateUsername(formData.username).valid}
-							<div class="field-error">{validateUsername(formData.username).error}</div>
-						{/if}
 					</div>
 					
 					<div class="form-field">
@@ -544,11 +540,7 @@ function cancelDelete() {
 							bind:value={formData.password}
 							disabled={!formEnabled || saveProgress.active || deleteProgress.active}
 							placeholder="Enter password"
-							class={formData.password && !validatePassword(formData.password).valid ? 'error' : ''}
 						/>
-						{#if formData.password && !validatePassword(formData.password).valid}
-							<div class="field-error">{validatePassword(formData.password).error}</div>
-						{/if}
 					</div>
 					
 					<div class="form-actions">
@@ -1003,22 +995,7 @@ function cancelDelete() {
 	cursor: not-allowed;
 }
 
-/* Validation styles */
-.field-error {
-	color: #dc2626;
-	font-size: 0.875rem;
-	margin-top: 0.25rem;
-}
 
-input.error {
-	border-color: #dc2626;
-	background-color: #fef2f2;
-}
-
-input.error:focus {
-	border-color: #dc2626;
-	box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
-}
 
 /* Responsive design */
 @media (max-width: 768px) {

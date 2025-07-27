@@ -467,16 +467,33 @@ function getJwtFromRequest(request) {
 
 async function requireAdmin(request, env) {
   const token = getJwtFromRequest(request);
-  if (!token) return null;
+  if (!token) {
+    console.log('No JWT token found in request');
+    return null;
+  }
+  
   try {
+    if (!env.JWT_SECRET) {
+      console.error('JWT_SECRET environment variable is not set');
+      return null;
+    }
+    
     const secret = new TextEncoder().encode(env.JWT_SECRET);
     const { payload } = await jwtVerify(token, secret);
-    if (!payload.roles || !payload.roles.includes("admin")) return null;
+    
+    console.log('JWT payload:', payload);
+    
+    if (!payload.roles || !payload.roles.includes("admin")) {
+      console.log('User does not have admin role');
+      return null;
+    }
     
     // Validate session if sessionId is present
     if (payload.sessionId) {
+      console.log('Validating session:', payload.sessionId);
       const sessionRaw = await env.USERS.get(`session:${payload.sessionId}`);
       if (!sessionRaw) {
+        console.log('Session not found in KV store');
         return null; // Session not found or expired
       }
       
@@ -1083,8 +1100,19 @@ async function handleAdminApi(request, env) {
   
   if (url.pathname === "/admin/api/session/info" && request.method === "GET") {
     try {
+      // Debug: Log admin object
+      console.log('Session info - admin object:', admin);
+      
+      if (!admin) {
+        return jsonResponse({ error: "Admin authentication failed" }, 401, origin);
+      }
+      
       if (!admin.sessionId) {
         return jsonResponse({ error: "No active session" }, 400, origin);
+      }
+      
+      if (!admin.username) {
+        return jsonResponse({ error: "No username in admin object" }, 400, origin);
       }
       
       const sessionRaw = await env.USERS.get(`session:${admin.sessionId}`);
@@ -1124,6 +1152,7 @@ async function handleAdminApi(request, env) {
         maxSessions: 3
       }, 200, origin);
     } catch (e) {
+      console.error('Session info error:', e);
       return jsonResponse({ error: e.message || 'Error fetching session info' }, 500, origin);
     }
   }
