@@ -12,6 +12,6 @@
     "wrangler": "^4.25.0"
   },
   "scripts": {
-    "build": "cd admin && npm run build && cd .. && node build.js"
+    "build": "cd admin && npm run build"
   }
 }

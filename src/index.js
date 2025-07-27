@@ -278,34 +278,48 @@ export default {
       // Try to serve the specific file first
       let response = await env.ASSETS.fetch(request);
       
-      // If the file exists and is not an HTML file, serve it directly without admin headers
+      // If the file exists, serve it directly
       if (response.status === 200) {
         const contentType = response.headers.get('content-type');
+        // For non-HTML files (static assets), serve without admin headers
         if (contentType && !contentType.includes('text/html')) {
           return response;
         }
+        // For HTML files, add admin headers
+        const newHeaders = new Headers(response.headers);
+        Object.entries(adminHeaders).forEach(([key, value]) => {
+          newHeaders.set(key, value);
+        });
+        return new Response(response.body, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: newHeaders,
+        });
       }
       
-      // If the file doesn't exist (404) or is HTML, serve index.html for SPA routing
+      // If the file doesn't exist (404), serve index.html for SPA routing
       if (response.status === 404) {
         const indexRequest = new Request(new URL('/admin/index.html', request.url), {
           method: 'GET',
           headers: request.headers
         });
         response = await env.ASSETS.fetch(indexRequest);
+        
+        // Add admin headers to the SPA response
+        const newHeaders = new Headers(response.headers);
+        Object.entries(adminHeaders).forEach(([key, value]) => {
+          newHeaders.set(key, value);
+        });
+        
+        return new Response(response.body, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: newHeaders,
+        });
       }
       
-      // Only add admin security headers to HTML responses (SPA routes)
-      const newHeaders = new Headers(response.headers);
-      Object.entries(adminHeaders).forEach(([key, value]) => {
-        newHeaders.set(key, value);
-      });
-      
-      return new Response(response.body, {
-        status: response.status,
-        statusText: response.statusText,
-        headers: newHeaders,
-      });
+      // For any other status, return as-is
+      return response;
     }
 
     // Handle CORS preflight
