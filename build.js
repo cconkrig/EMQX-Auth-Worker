@@ -15,21 +15,25 @@ function copyAssets() {
     }
     
     if (fs.existsSync(src)) {
-        fs.readdirSync(src).forEach(file => {
-            const srcPath = path.join(src, file);
-            const destPath = path.join(dest, file);
-            
-            if (fs.statSync(srcPath).isDirectory()) {
-                if (!fs.existsSync(destPath)) {
-                    fs.mkdirSync(destPath, { recursive: true });
-                }
-                fs.readdirSync(srcPath).forEach(subFile => {
-                    fs.copyFileSync(path.join(srcPath, subFile), path.join(destPath, subFile));
-                });
-            } else {
-                fs.copyFileSync(srcPath, destPath);
+        // Copy all files and directories recursively
+        function copyRecursive(srcDir, destDir) {
+            if (!fs.existsSync(destDir)) {
+                fs.mkdirSync(destDir, { recursive: true });
             }
-        });
+            
+            fs.readdirSync(srcDir).forEach(file => {
+                const srcPath = path.join(srcDir, file);
+                const destPath = path.join(destDir, file);
+                
+                if (fs.statSync(srcPath).isDirectory()) {
+                    copyRecursive(srcPath, destPath);
+                } else {
+                    fs.copyFileSync(srcPath, destPath);
+                }
+            });
+        }
+        
+        copyRecursive(src, dest);
         console.log('✅ Static assets copied successfully');
     } else {
         console.log('⚠️  No static assets found in admin/static');

@@ -151,7 +151,7 @@ async function handleSubmit() {
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	        background: #1a1a1a url('/admin/bg.jpg') no-repeat center center;
+	        background: #1a1a1a url('/img/bg.jpg') no-repeat center center;
 	background-size: cover;
 	padding: 2rem;
 }
