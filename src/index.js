@@ -467,35 +467,20 @@ function getJwtFromRequest(request) {
 
 async function requireAdmin(request, env) {
   const token = getJwtFromRequest(request);
-  if (!token) {
-    console.log('No JWT token found in request');
-    return null;
-  }
+  if (!token) return null;
   
   try {
-    if (!env.JWT_SECRET) {
-      console.error('JWT_SECRET environment variable is not set');
-      return null;
-    }
-    
-    console.log('JWT_SECRET is set, length:', env.JWT_SECRET.length);
+    if (!env.JWT_SECRET) return null;
     
     const secret = new TextEncoder().encode(env.JWT_SECRET);
     const { payload } = await jwtVerify(token, secret);
     
-    console.log('JWT payload:', payload);
-    
-    if (!payload.roles || !payload.roles.includes("admin")) {
-      console.log('User does not have admin role');
-      return null;
-    }
+    if (!payload.roles || !payload.roles.includes("admin")) return null;
     
     // Validate session if sessionId is present
     if (payload.sessionId) {
-      console.log('Validating session:', payload.sessionId);
       const sessionRaw = await env.USERS.get(`session:${payload.sessionId}`);
       if (!sessionRaw) {
-        console.log('Session not found in KV store');
         return null; // Session not found or expired
       }
       
