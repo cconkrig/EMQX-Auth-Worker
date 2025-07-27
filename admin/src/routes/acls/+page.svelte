@@ -56,10 +56,8 @@ async function loadUsers() {
 		}
 		
 		const data = await res.json();
-		console.log('Loaded users:', data.users);
 		users = data.users || [];
 	} catch (e: any) {
-		console.error('Load users error:', e);
 		dashboardError = e.message || 'Failed to load users';
 	} finally {
 		dashboardLoading = false;
@@ -173,7 +171,6 @@ async function saveAcls() {
 				(window as any).resetSessionTimeout();
 			}
 			
-			console.log('Saving ACLs for user:', selectedUser);
 			const res = await fetch('/admin/api/user-acls', {
 				method: 'PUT',
 				headers: {
@@ -191,8 +188,6 @@ async function saveAcls() {
 				throw new Error(`Failed to save permissions: ${res.status} ${errorText}`);
 			}
 			
-			console.log('ACLs saved successfully');
-			
 			// Implement retry mechanism to confirm ACLs are saved
 			const retryDelay = 5000; // 5 seconds
 			
@@ -200,7 +195,6 @@ async function saveAcls() {
 				saveProgress.retryCount++;
 				saveProgress.message = `Saving permissions... this may take a moment while it propagates to the network... (Attempt ${saveProgress.retryCount}/${saveProgress.maxRetries})`;
 				
-				console.log(`Retry ${saveProgress.retryCount}/${saveProgress.maxRetries} - waiting ${retryDelay}ms...`);
 				await new Promise(resolve => setTimeout(resolve, retryDelay));
 				
 				// Reload user details to confirm ACLs are saved
@@ -214,17 +208,15 @@ async function saveAcls() {
 						
 						// Check if ACLs match (simple length check for now)
 						if (reloadedAcls.length === userAcls.length) {
-							console.log('ACLs confirmed saved after retry');
 							break;
 						}
 					}
 				} catch (e) {
-					console.warn('Failed to reload user details during retry:', e);
+					// Silently continue retry
 				}
 			}
 			
 		} catch (e: any) {
-			console.error('Save ACLs error:', e);
 			dashboardError = e.message || 'Failed to save permissions';
 		} finally {
 			saveProgress.active = false;
@@ -339,14 +331,13 @@ function getCallLettersFromTopic(topic: string): { callLetters: string; frequenc
 								<input 
 									id="callLetters"
 									type="text" 
-									value={newPermission.callLetters}
+									bind:value={newPermission.callLetters}
 									disabled={saveProgress.active}
 									placeholder="Enter call letters"
 									on:keydown={(e) => e.key === 'Enter' && addPermission()}
 									on:input={(e) => {
-										// Force uppercase
-										const target = e.target as HTMLInputElement;
-										newPermission.callLetters = target.value.toUpperCase();
+										// Force uppercase conversion
+										newPermission.callLetters = newPermission.callLetters.toUpperCase();
 									}}
 								/>
 								<select 
