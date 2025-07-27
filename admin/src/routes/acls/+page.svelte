@@ -125,17 +125,18 @@ function addPermission() {
 	const topicName = `${callLetters.toLowerCase()}_${newPermission.frequency.toLowerCase()}`;
 	
 	// Check if permission already exists for this call letters
-	const existingIndex = userAcls.findIndex(acl => acl.topic === `station/${topicName}`);
+	const existingIndex = userAcls.findIndex(acl => acl.topic === `carrelink/${topicName}/relays`);
 	if (existingIndex !== -1) {
 		dashboardError = `Permission for Call Letters "${callLetters} ${newPermission.frequency}" already exists`;
 		return;
 	}
 	
-	// Create the ACL object
+	// Create the ACL object with the new format
 	const acl = {
-		topic: `station/${topicName}`,
-		permission: newPermission.canReceive && newPermission.canSend ? 'all' : 
-				   newPermission.canReceive ? 'subscribe' : 'publish'
+		topic: `carrelink/${topicName}/relays`,
+		permission: 'allow',
+		action: newPermission.canReceive && newPermission.canSend ? 'all' : 
+			   newPermission.canReceive ? 'subscribe' : 'publish'
 	};
 	
 	userAcls = [...userAcls, acl];
@@ -231,28 +232,27 @@ async function saveAcls() {
 	}, 0);
 }
 
-function formatPermission(permission: string): string {
-	switch (permission) {
+function formatPermission(action: string): string {
+	switch (action) {
 		case 'all': return 'Receive & Send';
 		case 'subscribe': return 'Receive Only';
 		case 'publish': return 'Send Only';
-		default: return permission;
+		default: return action;
 	}
 }
 
 function getCallLettersFromTopic(topic: string): { callLetters: string; frequency: string } {
-	// Extract call letters and frequency from "station/callsign_frequency" format
-	const match = topic.match(/^station\/(.+)_(.+)$/);
+	// Extract call letters and frequency from "carrelink/callsign_frequency/relays" format
+	const match = topic.match(/^carrelink\/(.+)_(.+)\/relays$/);
 	if (match) {
 		return {
 			callLetters: match[1].toUpperCase(),
 			frequency: match[2].toUpperCase()
 		};
 	}
-	// Fallback for old format without frequency
-	const oldMatch = topic.match(/^station\/(.+)$/);
+	// Fallback for unexpected format
 	return {
-		callLetters: oldMatch ? oldMatch[1].toUpperCase() : topic,
+		callLetters: topic,
 		frequency: 'FM'
 	};
 }
@@ -339,7 +339,7 @@ function getCallLettersFromTopic(topic: string): { callLetters: string; frequenc
 								<input 
 									id="callLetters"
 									type="text" 
-									bind:value={newPermission.callLetters}
+									value={newPermission.callLetters}
 									disabled={saveProgress.active}
 									placeholder="Enter call letters"
 									on:keydown={(e) => e.key === 'Enter' && addPermission()}
@@ -404,7 +404,7 @@ function getCallLettersFromTopic(topic: string): { callLetters: string; frequenc
 								<div class="permission-item">
 									<div class="permission-info">
 										<div class="call-letters">{callLettersInfo.callLetters} {callLettersInfo.frequency}</div>
-										<div class="permission-type">{formatPermission(acl.permission)}</div>
+										<div class="permission-type">{formatPermission(acl.action)}</div>
 									</div>
 									<button 
 										class="remove-btn"
