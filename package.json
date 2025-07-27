@@ -11,5 +11,7 @@
     "@sveltejs/adapter-static": "^3.0.8",
     "wrangler": "^4.25.0"
   },
-  "scripts": {}
+  "scripts": {
+    "build": "cd admin && npm run build && cd .. && node build.js"
+  }
 }
