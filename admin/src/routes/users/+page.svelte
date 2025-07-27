@@ -270,12 +270,21 @@ async function saveUser() {
 }
 
 function confirmDeleteUser(user: string) {
+	if (!user) {
+		console.error('Cannot confirm delete: user parameter is null or empty');
+		dashboardError = 'Cannot delete user: invalid user selection';
+		return;
+	}
 	userToDelete = user;
 	showDeleteConfirm = true;
 }
 
 async function deleteUser() {
-	if (!userToDelete) return;
+	if (!userToDelete) {
+		console.error('Cannot delete user: userToDelete is null');
+		dashboardError = 'Cannot delete user: no user selected';
+		return;
+	}
 	
 	// Start delete progress
 	deleteProgress = {
@@ -408,7 +417,7 @@ function cancelDelete() {
 			</button>
 			<button 
 				class="action-btn delete-btn" 
-				on:click={() => confirmDeleteUser(selectedUser!)}
+				on:click={() => selectedUser && confirmDeleteUser(selectedUser)}
 				disabled={!selectedUser || formMode !== 'none' || saveProgress.active || deleteProgress.active}
 			>
 				Delete
