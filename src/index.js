@@ -40,9 +40,6 @@ function getCorsHeaders(origin) {
   };
 }
 
-// Enhanced Content Security Policy & XSS Protection
-const cspNonce = crypto.randomUUID().replace(/-/g, '');
-
 // Logging helper function
 function log(pathname, msg, ...args) {
   console.log(`[${pathname}] ${msg}`, ...args);
@@ -53,36 +50,44 @@ function audit(adminUsername, action, target) {
   console.log(`[AUDIT] admin=${adminUsername} action=${action} target=${target || ''}`);
 }
 
-// Comprehensive CSP policy for admin UI
-const adminHeaders = {
-  "Content-Security-Policy": [
-    "default-src 'self'",
-    "script-src 'self' 'nonce-" + cspNonce + "' 'strict-dynamic'",
-    "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob:",
-    "font-src 'self' data:",
-    "connect-src 'self'",
-    "frame-ancestors 'none'",
-    "base-uri 'self'",
-    "form-action 'self'",
-    "frame-src 'none'",
-    "object-src 'none'",
-    "media-src 'none'",
-    "manifest-src 'self'",
-    "worker-src 'self'",
-    "child-src 'none'",
-    "upgrade-insecure-requests"
-  ].join("; "),
-  "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
-  "X-Content-Type-Options": "nosniff",
-  "X-Frame-Options": "DENY",
-  "X-XSS-Protection": "1; mode=block",
-  "Referrer-Policy": "strict-origin-when-cross-origin",
-  "Permissions-Policy": "geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=(), ambient-light-sensor=()",
-  "Cross-Origin-Embedder-Policy": "require-corp",
-  "Cross-Origin-Opener-Policy": "same-origin",
-  "Cross-Origin-Resource-Policy": "same-origin"
-};
+// Generate CSP nonce function
+function generateCspNonce() {
+  return crypto.randomUUID().replace(/-/g, '');
+}
+
+// Get admin headers with dynamic CSP nonce
+function getAdminHeaders() {
+  const cspNonce = generateCspNonce();
+  return {
+    "Content-Security-Policy": [
+      "default-src 'self'",
+      "script-src 'self' 'nonce-" + cspNonce + "' 'strict-dynamic'",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob:",
+      "font-src 'self' data:",
+      "connect-src 'self'",
+      "frame-ancestors 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "frame-src 'none'",
+      "object-src 'none'",
+      "media-src 'none'",
+      "manifest-src 'self'",
+      "worker-src 'self'",
+      "child-src 'none'",
+      "upgrade-insecure-requests"
+    ].join("; "),
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "X-XSS-Protection": "1; mode=block",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=(), ambient-light-sensor=()",
+    "Cross-Origin-Embedder-Policy": "require-corp",
+    "Cross-Origin-Opener-Policy": "same-origin",
+    "Cross-Origin-Resource-Policy": "same-origin"
+  };
+}
 
 // CSP policy for API responses
 const apiCspHeaders = {
@@ -408,10 +413,6 @@ function validateUrl(url) {
   }
   
   return url;
-}
-
-function generateCspNonce() {
-  return crypto.randomUUID().replace(/-/g, '');
 }
 
 function validateAclRule(rule) {
@@ -1212,20 +1213,10 @@ export default {
         }
         // For HTML files, add admin headers with CSP nonce
         const newHeaders = new Headers(response.headers);
-        const currentNonce = generateCspNonce();
-        
-        // Update CSP header with current nonce
-        const updatedCsp = adminHeaders["Content-Security-Policy"].replace(
-          /'nonce-[^']*'/g, 
-          `'nonce-${currentNonce}'`
-        );
+        const adminHeaders = getAdminHeaders();
         
         Object.entries(adminHeaders).forEach(([key, value]) => {
-          if (key === "Content-Security-Policy") {
-            newHeaders.set(key, updatedCsp);
-          } else {
-            newHeaders.set(key, value);
-          }
+          newHeaders.set(key, value);
         });
         
         return new Response(response.body, {
@@ -1245,20 +1236,10 @@ export default {
         
         // Add admin headers to the SPA response with CSP nonce
         const newHeaders = new Headers(response.headers);
-        const currentNonce = generateCspNonce();
-        
-        // Update CSP header with current nonce
-        const updatedCsp = adminHeaders["Content-Security-Policy"].replace(
-          /'nonce-[^']*'/g, 
-          `'nonce-${currentNonce}'`
-        );
+        const adminHeaders = getAdminHeaders();
         
         Object.entries(adminHeaders).forEach(([key, value]) => {
-          if (key === "Content-Security-Policy") {
-            newHeaders.set(key, updatedCsp);
-          } else {
-            newHeaders.set(key, value);
-          }
+          newHeaders.set(key, value);
         });
         
         return new Response(response.body, {
