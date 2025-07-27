@@ -275,39 +275,31 @@ export default {
       (url.pathname === "/admin" || url.pathname.startsWith("/admin/")) &&
       request.method === "GET"
     ) {
-      console.log(`[ADMIN] Serving admin UI for path: ${url.pathname}`);
-      
       // Try to serve the specific file first
       let response = await env.ASSETS.fetch(request);
-      console.log(`[ADMIN] Initial response status: ${response.status}`);
       
-      // If the file exists and is not an HTML file, serve it directly
+      // If the file exists and is not an HTML file, serve it directly without admin headers
       if (response.status === 200) {
         const contentType = response.headers.get('content-type');
         if (contentType && !contentType.includes('text/html')) {
-          console.log(`[ADMIN] Serving static file: ${url.pathname}, content-type: ${contentType}`);
           return response;
         }
       }
       
       // If the file doesn't exist (404) or is HTML, serve index.html for SPA routing
       if (response.status === 404) {
-        console.log(`[ADMIN] File not found, serving index.html for SPA routing`);
         const indexRequest = new Request(new URL('/admin/index.html', request.url), {
           method: 'GET',
           headers: request.headers
         });
         response = await env.ASSETS.fetch(indexRequest);
-        console.log(`[ADMIN] Index.html response status: ${response.status}`);
       }
       
-      // Add admin security headers to the response
+      // Only add admin security headers to HTML responses (SPA routes)
       const newHeaders = new Headers(response.headers);
       Object.entries(adminHeaders).forEach(([key, value]) => {
         newHeaders.set(key, value);
       });
-      
-      console.log(`[ADMIN] Final response status: ${response.status}, content-type: ${newHeaders.get('content-type')}`);
       
       return new Response(response.body, {
         status: response.status,
