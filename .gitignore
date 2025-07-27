@@ -10,6 +10,9 @@ static/
 dist/
 build/
 
+# Allow admin static assets
+!admin/static/
+
 # Local env files
 .env
 .env.*
