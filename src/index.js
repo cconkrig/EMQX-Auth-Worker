@@ -1,14 +1,24 @@
 import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from 'jose';
 
-// CORS and security headers
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-  "X-Content-Type-Options": "nosniff",
-  "Referrer-Policy": "no-referrer",
-};
+// CORS and security headers - dynamically set based on origin
+function getCorsHeaders(origin) {
+  // Allow specific cyber-comp.cc subdomains
+  const allowedOrigins = [
+    'https://msgwrk-qt4g0063hh.cyber-comp.cc'
+  ];
+  
+  // Check if origin is allowed
+  const isAllowed = allowedOrigins.includes(origin);
+  
+  return {
+    "Access-Control-Allow-Origin": isAllowed ? origin : "",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "no-referrer",
+  };
+}
 
 // Admin UI security headers - allows SvelteKit to run
 const adminHeaders = {
@@ -18,7 +28,8 @@ const adminHeaders = {
   "Referrer-Policy": "no-referrer",
 };
 
-function jsonResponse(body, status = 200) {
+function jsonResponse(body, status = 200, origin = null) {
+  const corsHeaders = origin ? getCorsHeaders(origin) : getCorsHeaders("");
   return new Response(JSON.stringify(body), {
     status,
     headers: {
@@ -120,6 +131,7 @@ async function requireAdmin(request, env) {
 
 async function handleAdminApi(request, env) {
   const url = new URL(request.url);
+  const origin = request.headers.get("Origin");
 
   // Bootstrap endpoint - creates first admin user if none exists
   if (url.pathname === "/admin/api/bootstrap" && request.method === "POST") {
@@ -127,17 +139,17 @@ async function handleAdminApi(request, env) {
       // Check if any admin users exist
       const adminList = await env.USERS.list({ prefix: "admin:" });
       if (adminList.keys.length > 0) {
-        return jsonResponse({ error: "Not Allowed" }, 400);
+        return jsonResponse({ error: "Not Allowed" }, 400, origin);
       }
 
       const { username, password } = await request.json();
       if (!username || !password) {
-        return jsonResponse({ error: "Missing username or password" }, 400);
+        return jsonResponse({ error: "Missing username or password" }, 400, origin);
       }
 
       // Validate username and password
       if (!validateUsername(username) || !validatePassword(password)) {
-        return jsonResponse({ error: "Invalid username or password format" }, 400);
+        return jsonResponse({ error: "Invalid username or password format" }, 400, origin);
       }
 
       // Create admin user
@@ -150,9 +162,9 @@ async function handleAdminApi(request, env) {
       await env.USERS.put(`admin:${username}`, JSON.stringify(adminObj));
       
       console.log(`[BOOTSTRAP] Created first admin user: ${username}`);
-      return jsonResponse({ success: true, message: "Admin user created successfully" });
+      return jsonResponse({ success: true, message: "Admin user created successfully" }, 200, origin);
     } catch (e) {
-      return jsonResponse({ error: e.message || 'Error creating admin user' }, 500);
+      return jsonResponse({ error: e.message || 'Error creating admin user' }, 500, origin);
     }
   }
 
@@ -160,32 +172,32 @@ async function handleAdminApi(request, env) {
   if (url.pathname.endsWith("/admin/api/login") && request.method === "POST") {
     const { username, password } = await request.json();
     if (!username || !password) {
-      return jsonResponse({ error: "Missing credentials" }, 400);
+      return jsonResponse({ error: "Missing credentials" }, 400, origin);
     }
     const adminRaw = await env.USERS.get(`admin:${username}`);
     if (!adminRaw) {
-      return jsonResponse({ error: "Invalid credentials" }, 401);
+      return jsonResponse({ error: "Invalid credentials" }, 401, origin);
     }
     let admin;
     try {
       admin = JSON.parse(adminRaw);
     } catch {
-      return jsonResponse({ error: "Corrupt admin data" }, 500);
+      return jsonResponse({ error: "Corrupt admin data" }, 500, origin);
     }
     const ok = await bcrypt.compare(password, admin.password_hash);
     if (!ok) {
-      return jsonResponse({ error: "Invalid credentials" }, 401);
+      return jsonResponse({ error: "Invalid credentials" }, 401, origin);
     }
     const secret = new TextEncoder().encode(env.JWT_SECRET);
     const token = await new SignJWT({ username, roles: admin.roles || [] })
       .setProtectedHeader({ alg: 'HS256' })
       .setExpirationTime('1h')
       .sign(secret);
-    return jsonResponse({ token });
+    return jsonResponse({ token }, 200, origin);
   }
 
   const admin = await requireAdmin(request, env);
-  if (!admin) return jsonResponse({ error: "Unauthorized" }, 401);
+  if (!admin) return jsonResponse({ error: "Unauthorized" }, 401, origin);
 
   // Audit log helper
   function audit(action, target) {
@@ -195,82 +207,83 @@ async function handleAdminApi(request, env) {
   if (url.pathname === "/admin/api/user" && request.method === "POST") {
     try {
       const { username, password, acls } = await request.json();
-      if (!username || !password) return jsonResponse({ error: "Missing username or password" }, 400);
+      if (!username || !password) return jsonResponse({ error: "Missing username or password" }, 400, origin);
       const hash = await bcrypt.hash(password, 12);
       const userObj = { password_hash: hash, acls: Array.isArray(acls) ? acls : [] };
       await env.USERS.put(`user:${username}`, JSON.stringify(userObj));
       audit('create_or_update_user', username);
-      return jsonResponse({ success: true });
+      return jsonResponse({ success: true }, 200, origin);
     } catch (e) {
-      return jsonResponse({ error: e.message || 'Error creating/updating user' }, 500);
+      return jsonResponse({ error: e.message || 'Error creating/updating user' }, 500, origin);
     }
   }
   if (url.pathname === "/admin/api/user" && request.method === "DELETE") {
     try {
       const { username } = await request.json();
-      if (!username) return jsonResponse({ error: "Missing username" }, 400);
+      if (!username) return jsonResponse({ error: "Missing username" }, 400, origin);
       await env.USERS.delete(`user:${username}`);
       audit('delete_user', username);
-      return jsonResponse({ success: true });
+      return jsonResponse({ success: true }, 200, origin);
     } catch (e) {
-      return jsonResponse({ error: e.message || 'Error deleting user' }, 500);
+      return jsonResponse({ error: e.message || 'Error deleting user' }, 500, origin);
     }
   }
   if (url.pathname === "/admin/api/acl" && request.method === "POST") {
     try {
       const { username, acls } = await request.json();
-      if (!username || !Array.isArray(acls)) return jsonResponse({ error: "Missing username or acls" }, 400);
+      if (!username || !Array.isArray(acls)) return jsonResponse({ error: "Missing username or acls" }, 400, origin);
       const userRaw = await env.USERS.get(`user:${username}`);
-      if (!userRaw) return jsonResponse({ error: "User not found" }, 404);
+      if (!userRaw) return jsonResponse({ error: "User not found" }, 404, origin);
       let user;
-      try { user = JSON.parse(userRaw); } catch { return jsonResponse({ error: "Corrupt user data" }, 500); }
+      try { user = JSON.parse(userRaw); } catch { return jsonResponse({ error: "Corrupt user data" }, 500, origin); }
       user.acls = acls;
       await env.USERS.put(`user:${username}`, JSON.stringify(user));
       audit('update_acls', username);
-      return jsonResponse({ success: true });
+      return jsonResponse({ success: true }, 200, origin);
     } catch (e) {
-      return jsonResponse({ error: e.message || 'Error updating ACLs' }, 500);
+      return jsonResponse({ error: e.message || 'Error updating ACLs' }, 500, origin);
     }
   }
   if (url.pathname === "/admin/api/user-acls" && request.method === "PUT") {
     try {
       const { username, acls } = await request.json();
-      if (!username || !Array.isArray(acls)) return jsonResponse({ error: "Missing username or acls" }, 400);
+      if (!username || !Array.isArray(acls)) return jsonResponse({ error: "Missing username or acls" }, 400, origin);
       const userRaw = await env.USERS.get(`user:${username}`);
-      if (!userRaw) return jsonResponse({ error: "User not found" }, 404);
+      if (!userRaw) return jsonResponse({ error: "User not found" }, 404, origin);
       let user;
-      try { user = JSON.parse(userRaw); } catch { return jsonResponse({ error: "Corrupt user data" }, 500); }
+      try { user = JSON.parse(userRaw); } catch { return jsonResponse({ error: "Corrupt user data" }, 500, origin); }
       user.acls = acls;
       await env.USERS.put(`user:${username}`, JSON.stringify(user));
       audit('update_acls', username);
-      return jsonResponse({ success: true });
+      return jsonResponse({ success: true }, 200, origin);
     } catch (e) {
-      return jsonResponse({ error: e.message || 'Error updating ACLs' }, 500);
+      return jsonResponse({ error: e.message || 'Error updating ACLs' }, 500, origin);
     }
   }
   if (url.pathname === "/admin/api/users" && request.method === "GET") {
     try {
       const list = await env.USERS.list({ prefix: "user:" });
       const usernames = list.keys.map(k => k.name.slice(5));
-      return jsonResponse({ users: usernames });
+      return jsonResponse({ users: usernames }, 200, origin);
     } catch (e) {
-      return jsonResponse({ error: e.message || 'Error listing users' }, 500);
+      return jsonResponse({ error: e.message || 'Error listing users' }, 500, origin);
     }
   }
   if (url.pathname === "/admin/api/user-details" && request.method === "GET") {
     try {
       const username = url.searchParams.get('username');
-      if (!username) return jsonResponse({ error: "Missing username" }, 400);
+      if (!username) return jsonResponse({ error: "Missing username" }, 400, origin);
       const userRaw = await env.USERS.get(`user:${username}`);
-      if (!userRaw) return jsonResponse({ error: "User not found" }, 404);
+      if (!userRaw) return jsonResponse({ error: "User not found" }, 404, origin);
       let user;
-      try { user = JSON.parse(userRaw); } catch { return jsonResponse({ error: "Corrupt user data" }, 500); }
-      return jsonResponse({ username, acls: user.acls || [] });
+      try { user = JSON.parse(userRaw); } catch { return jsonResponse({ error: "Corrupt user data" }, 500, origin); }
+      return jsonResponse({ username, acls: user.acls || [] }, 200, origin);
     } catch (e) {
-      return jsonResponse({ error: e.message || 'Error fetching user details' }, 500);
+      return jsonResponse({ error: e.message || 'Error fetching user details' }, 500, origin);
     }
   }
-  return new Response("Not found", { status: 404 });
+  const corsHeaders = getCorsHeaders(origin);
+  return new Response("Not found", { status: 404, headers: corsHeaders });
 }
 
 export default {
@@ -340,6 +353,8 @@ export default {
 
     // Handle CORS preflight
     if (request.method === "OPTIONS") {
+      const origin = request.headers.get("Origin");
+      const corsHeaders = getCorsHeaders(origin);
       return new Response(null, { headers: corsHeaders });
     }
 
@@ -349,6 +364,8 @@ export default {
       request.method !== "POST" &&
       request.method !== "OPTIONS"
     ) {
+      const origin = request.headers.get("Origin");
+      const corsHeaders = getCorsHeaders(origin);
       return new Response("Method Not Allowed", { status: 405, headers: corsHeaders });
     }
 
@@ -360,6 +377,8 @@ export default {
       const authHeader = request.headers.get("Authorization") || "";
       const expected = `Bearer ${env.API_KEY}`;
       if (!env.API_KEY || authHeader !== expected) {
+        const origin = request.headers.get("Origin");
+        const corsHeaders = getCorsHeaders(origin);
         return new Response("Unauthorized", { status: 401, headers: corsHeaders });
       }
     }
@@ -372,8 +391,9 @@ export default {
 
     try {
       if (url.pathname === "/auth" && request.method === "POST") {
+        const origin = request.headers.get("Origin");
         if (isRateLimited(ip)) {
-          return jsonResponse({ result: "deny", reason: "Rate limit exceeded" }, 429);
+          return jsonResponse({ result: "deny", reason: "Rate limit exceeded" }, 429, origin);
         }
         const { username, password } = await request.json();
         log("Auth attempt for", username);
@@ -381,14 +401,14 @@ export default {
         if (!validateUsername(username) || !validatePassword(password)) {
           log("Invalid username or password format");
           incrementRateLimit(ip);
-          return jsonResponse({ result: "deny", reason: "Invalid credentials" }, 400);
+          return jsonResponse({ result: "deny", reason: "Invalid credentials" }, 400, origin);
         }
 
         const userKey = `user:${username}`;
         const userRaw = await env.USERS.get(userKey);
         if (!userRaw) {
           log("Auth user not found, returning ignore for EMQX fallback");
-          return jsonResponse({ result: "ignore" }, 200);
+          return jsonResponse({ result: "ignore" }, 200, origin);
         }
 
         let user;
@@ -397,28 +417,29 @@ export default {
         } catch (e) {
           log("Corrupt user data for", username);
           incrementRateLimit(ip);
-          return jsonResponse({ result: "deny" }, 200);
+          return jsonResponse({ result: "deny" }, 200, origin);
         }
 
         const hash = user.password_hash;
         if (!hash) {
           log("No password hash for", username);
           incrementRateLimit(ip);
-          return jsonResponse({ result: "deny" }, 200);
+          return jsonResponse({ result: "deny" }, 200, origin);
         }
 
         const ok = await bcrypt.compare(password, hash);
         log("Password check for", username, ok ? "OK" : "FAIL");
         if (!ok) {
           incrementRateLimit(ip);
-          return jsonResponse({ result: "deny" }, 200);
+          return jsonResponse({ result: "deny" }, 200, origin);
         }
-        return jsonResponse({ result: "allow" }, 200);
+        return jsonResponse({ result: "allow" }, 200, origin);
       }
 
       if (url.pathname === "/acl" && request.method === "POST") {
+        const origin = request.headers.get("Origin");
         if (isRateLimited(ip)) {
-          return jsonResponse({ result: "deny", reason: "Rate limit exceeded" }, 429);
+          return jsonResponse({ result: "deny", reason: "Rate limit exceeded" }, 429, origin);
         }
         const { username, action, topic } = await request.json();
         log("ACL check for", username, action, topic);
@@ -426,7 +447,7 @@ export default {
         if (!validateUsername(username) || !validateAction(action) || !validateTopic(topic)) {
           log("Invalid ACL params");
           incrementRateLimit(ip);
-          return jsonResponse({ result: "deny", reason: "Invalid params" }, 400);
+          return jsonResponse({ result: "deny", reason: "Invalid params" }, 400, origin);
         }
 
         const userKey = `user:${username}`;
@@ -434,7 +455,7 @@ export default {
         if (!userRaw) {
           log("ACL failed for", username);
           incrementRateLimit(ip);
-          return jsonResponse({ result: "deny" }, 200);
+          return jsonResponse({ result: "deny" }, 200, origin);
         }
 
         let user;
@@ -443,7 +464,7 @@ export default {
         } catch (e) {
           log("Corrupt user data for", username);
           incrementRateLimit(ip);
-          return jsonResponse({ result: "deny" }, 200);
+          return jsonResponse({ result: "deny" }, 200, origin);
         }
 
         const acls = user.acls || [];
@@ -456,14 +477,17 @@ export default {
         if (!allowed) {
           incrementRateLimit(ip);
         }
-        return jsonResponse({ result: allowed ? "allow" : "deny" }, 200);
+        return jsonResponse({ result: allowed ? "allow" : "deny" }, 200, origin);
       }
 
+      const origin = request.headers.get("Origin");
+      const corsHeaders = getCorsHeaders(origin);
       return new Response("Not found", { status: 404, headers: corsHeaders });
     } catch (err) {
       log("Internal error", err);
       incrementRateLimit(ip);
-      return jsonResponse({ result: "deny" }, 500);
+      const origin = request.headers.get("Origin");
+      return jsonResponse({ result: "deny" }, 500, origin);
     }
   },
 };
