@@ -43,6 +43,16 @@ function getCorsHeaders(origin) {
 // Enhanced Content Security Policy & XSS Protection
 const cspNonce = crypto.randomUUID().replace(/-/g, '');
 
+// Logging helper function
+function log(pathname, msg, ...args) {
+  console.log(`[${pathname}] ${msg}`, ...args);
+}
+
+// Audit log helper function
+function audit(adminUsername, action, target) {
+  console.log(`[AUDIT] admin=${adminUsername} action=${action} target=${target || ''}`);
+}
+
 // Comprehensive CSP policy for admin UI
 const adminHeaders = {
   "Content-Security-Policy": [
@@ -780,10 +790,7 @@ async function handleAdminApi(request, env) {
   }
   incrementAdminApiRateLimit(ip);
 
-  // Audit log helper
-  function audit(action, target) {
-    console.log(`[AUDIT] admin=${admin.username} action=${action} target=${target || ''}`);
-  }
+
 
   if (url.pathname === "/admin/api/user" && request.method === "POST") {
     try {
@@ -831,7 +838,7 @@ async function handleAdminApi(request, env) {
       };
       
       await env.USERS.put(`user:${sanitizedUsername}`, JSON.stringify(userObj));
-      audit('create_or_update_user', sanitizedUsername);
+      audit(admin.username, 'create_or_update_user', sanitizedUsername);
       return jsonResponse({ success: true }, 200, origin);
     } catch (e) {
       return jsonResponse({ error: e.message || 'Error creating/updating user' }, 500, origin);
@@ -860,7 +867,7 @@ async function handleAdminApi(request, env) {
       }
       
       await env.USERS.delete(`user:${sanitizedUsername}`);
-      audit('delete_user', sanitizedUsername);
+      audit(admin.username, 'delete_user', sanitizedUsername);
       return jsonResponse({ success: true }, 200, origin);
     } catch (e) {
       return jsonResponse({ error: e.message || 'Error deleting user' }, 500, origin);
@@ -909,7 +916,7 @@ async function handleAdminApi(request, env) {
       user.updated_at = new Date().toISOString();
       
       await env.USERS.put(`user:${sanitizedUsername}`, JSON.stringify(user));
-      audit('update_acls', sanitizedUsername);
+      audit(admin.username, 'update_acls', sanitizedUsername);
       return jsonResponse({ success: true }, 200, origin);
     } catch (e) {
       return jsonResponse({ error: e.message || 'Error updating ACLs' }, 500, origin);
@@ -958,7 +965,7 @@ async function handleAdminApi(request, env) {
       user.updated_at = new Date().toISOString();
       
       await env.USERS.put(`user:${sanitizedUsername}`, JSON.stringify(user));
-      audit('update_acls', sanitizedUsername);
+      audit(admin.username, 'update_acls', sanitizedUsername);
       return jsonResponse({ success: true }, 200, origin);
     } catch (e) {
       return jsonResponse({ error: e.message || 'Error updating ACLs' }, 500, origin);
@@ -1038,7 +1045,7 @@ async function handleAdminApi(request, env) {
         .setExpirationTime('1h')
         .sign(secret);
         
-      audit('refresh_session', admin.sessionId);
+      audit(admin.username, 'refresh_session', admin.sessionId);
       return jsonResponse({ 
         token,
         expiresAt: tokenExpiry,
@@ -1070,7 +1077,7 @@ async function handleAdminApi(request, env) {
           }
         }
         
-        audit('logout_session', admin.sessionId);
+        audit(admin.username, 'logout_session', admin.sessionId);
       }
       
       return jsonResponse({ success: true }, 200, origin);
@@ -1144,7 +1151,7 @@ async function handleAdminApi(request, env) {
           // Clear user's session list
           await env.USERS.delete(userSessionsKey);
           
-          audit('logout_all_sessions', `${userSessions.length} sessions`);
+          audit(admin.username, 'logout_all_sessions', `${userSessions.length} sessions`);
         } catch {
           // Ignore errors
         }
@@ -1313,11 +1320,6 @@ export default {
     }
 
     // Check rate limit (only for failed requests, so check after processing)
-    // Logging helper
-    function log(msg, ...args) {
-      console.log(`[${url.pathname}] ${msg}`, ...args);
-    }
-
     try {
       const origin = request.headers.get("Origin");
 
@@ -1326,10 +1328,10 @@ export default {
           return jsonResponse({ result: "deny", reason: "Rate limit exceeded" }, 429, origin);
         }
         const { username, password } = await request.json();
-        log("Auth attempt for", username);
+        log(url.pathname, "Auth attempt for", username);
 
         if (!validateUsername(username) || !validatePassword(password)) {
-          log("Invalid username or password format");
+          log(url.pathname, "Invalid username or password format");
           incrementRateLimit(ip);
           return jsonResponse({ result: "deny", reason: "Invalid credentials" }, 400, origin);
         }
@@ -1337,7 +1339,7 @@ export default {
         const userKey = `user:${username}`;
         const userRaw = await env.USERS.get(userKey);
         if (!userRaw) {
-          log("Auth user not found, returning ignore for EMQX fallback");
+          log(url.pathname, "Auth user not found, returning ignore for EMQX fallback");
           return jsonResponse({ result: "ignore" }, 200, origin);
         }
 
@@ -1345,20 +1347,20 @@ export default {
         try {
           user = JSON.parse(userRaw);
         } catch (e) {
-          log("Corrupt user data for", username);
+          log(url.pathname, "Corrupt user data for", username);
           incrementRateLimit(ip);
           return jsonResponse({ result: "deny" }, 200, origin);
         }
 
         const hash = user.password_hash;
         if (!hash) {
-          log("No password hash for", username);
+          log(url.pathname, "No password hash for", username);
           incrementRateLimit(ip);
           return jsonResponse({ result: "deny" }, 200, origin);
         }
 
         const ok = await bcrypt.compare(password, hash);
-        log("Password check for", username, ok ? "OK" : "FAIL");
+        log(url.pathname, "Password check for", username, ok ? "OK" : "FAIL");
         if (!ok) {
           incrementRateLimit(ip);
           return jsonResponse({ result: "deny" }, 200, origin);
@@ -1371,10 +1373,10 @@ export default {
           return jsonResponse({ result: "deny", reason: "Rate limit exceeded" }, 429, origin);
         }
         const { username, action, topic } = await request.json();
-        log("ACL check for", username, action, topic);
+        log(url.pathname, "ACL check for", username, action, topic);
 
         if (!validateUsername(username) || !validateAction(action) || !validateTopic(topic)) {
-          log("Invalid ACL params");
+          log(url.pathname, "Invalid ACL params");
           incrementRateLimit(ip);
           return jsonResponse({ result: "deny", reason: "Invalid params" }, 400, origin);
         }
@@ -1382,7 +1384,7 @@ export default {
         const userKey = `user:${username}`;
         const userRaw = await env.USERS.get(userKey);
         if (!userRaw) {
-          log("ACL failed for", username);
+          log(url.pathname, "ACL failed for", username);
           incrementRateLimit(ip);
           return jsonResponse({ result: "deny" }, 200, origin);
         }
@@ -1391,7 +1393,7 @@ export default {
         try {
           user = JSON.parse(userRaw);
         } catch (e) {
-          log("Corrupt user data for", username);
+          log(url.pathname, "Corrupt user data for", username);
           incrementRateLimit(ip);
           return jsonResponse({ result: "deny" }, 200, origin);
         }
@@ -1402,7 +1404,7 @@ export default {
             rule.action === action &&
             topicMatches(rule.topic, topic)
         );
-        log("ACL result for", username, allowed ? "ALLOW" : "DENY");
+        log(url.pathname, "ACL result for", username, allowed ? "ALLOW" : "DENY");
         if (!allowed) {
           incrementRateLimit(ip);
         }
@@ -1412,7 +1414,7 @@ export default {
       const corsHeaders = getCorsHeaders(origin);
       return new Response("Not found", { status: 404, headers: corsHeaders });
     } catch (err) {
-      log("Internal error", err);
+      log(url.pathname, "Internal error", err);
       incrementRateLimit(ip);
       return jsonResponse({ result: "deny" }, 500, origin);
     }
