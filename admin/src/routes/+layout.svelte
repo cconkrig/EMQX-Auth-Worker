@@ -190,7 +190,7 @@ function logout(reason = 'User logged out') {
 			<ul class="sidebar-nav">
 				<li><a href="/admin/" class:active={$page.url.pathname === '/admin/'}>Dashboard</a></li>
 				<li><a href="/admin/users" class:active={$page.url.pathname === '/admin/users'}>Users</a></li>
-				<li><a href="/admin/acls" class:active={$page.url.pathname === '/admin/acls'}>ACLs</a></li>
+				<li><a href="/admin/acls" class:active={$page.url.pathname === '/admin/acls'}>Permission Management</a></li>
 				<li><button type="button" class="logout-link" on:click={() => logout()}>Logout</button></li>
 			</ul>
 		</nav>

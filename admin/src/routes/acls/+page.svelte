@@ -11,6 +11,7 @@ let dashboardLoading = false;
 // Form state
 let newPermission = {
 	callLetters: '',
+	frequency: 'FM',
 	canReceive: false,
 	canSend: false
 };
@@ -96,14 +97,22 @@ async function selectUser(user: string) {
 function clearNewPermission() {
 	newPermission = {
 		callLetters: '',
+		frequency: 'FM',
 		canReceive: false,
 		canSend: false
 	};
 }
 
 function addPermission() {
-	if (!newPermission.callLetters.trim()) {
+	const callLetters = newPermission.callLetters.trim().toUpperCase();
+	
+	if (!callLetters) {
 		dashboardError = 'Call Letters are required';
+		return;
+	}
+	
+	if (callLetters.length < 3) {
+		dashboardError = 'Call Letters must be at least 3 characters';
 		return;
 	}
 	
@@ -112,16 +121,19 @@ function addPermission() {
 		return;
 	}
 	
+	// Create the topic name in lowercase for storage
+	const topicName = `${callLetters.toLowerCase()}_${newPermission.frequency.toLowerCase()}`;
+	
 	// Check if permission already exists for this call letters
-	const existingIndex = userAcls.findIndex(acl => acl.topic === `station/${newPermission.callLetters.trim()}`);
+	const existingIndex = userAcls.findIndex(acl => acl.topic === `station/${topicName}`);
 	if (existingIndex !== -1) {
-		dashboardError = `Permission for Call Letters "${newPermission.callLetters.trim()}" already exists`;
+		dashboardError = `Permission for Call Letters "${callLetters} ${newPermission.frequency}" already exists`;
 		return;
 	}
 	
 	// Create the ACL object
 	const acl = {
-		topic: `station/${newPermission.callLetters.trim()}`,
+		topic: `station/${topicName}`,
 		permission: newPermission.canReceive && newPermission.canSend ? 'all' : 
 				   newPermission.canReceive ? 'subscribe' : 'publish'
 	};
@@ -228,10 +240,21 @@ function formatPermission(permission: string): string {
 	}
 }
 
-function getCallLettersFromTopic(topic: string): string {
-	// Extract call letters from "station/CALLSIGN" format
-	const match = topic.match(/^station\/(.+)$/);
-	return match ? match[1] : topic;
+function getCallLettersFromTopic(topic: string): { callLetters: string; frequency: string } {
+	// Extract call letters and frequency from "station/callsign_frequency" format
+	const match = topic.match(/^station\/(.+)_(.+)$/);
+	if (match) {
+		return {
+			callLetters: match[1].toUpperCase(),
+			frequency: match[2].toUpperCase()
+		};
+	}
+	// Fallback for old format without frequency
+	const oldMatch = topic.match(/^station\/(.+)$/);
+	return {
+		callLetters: oldMatch ? oldMatch[1].toUpperCase() : topic,
+		frequency: 'FM'
+	};
 }
 </script>
 
@@ -312,14 +335,28 @@ function getCallLettersFromTopic(topic: string): string {
 						
 						<div class="form-field">
 							<label for="callLetters">Call Letters</label>
-							<input 
-								id="callLetters"
-								type="text" 
-								bind:value={newPermission.callLetters}
-								disabled={saveProgress.active}
-								placeholder="Enter call letters"
-								on:keydown={(e) => e.key === 'Enter' && addPermission()}
-							/>
+							<div class="call-letters-group">
+								<input 
+									id="callLetters"
+									type="text" 
+									bind:value={newPermission.callLetters}
+									disabled={saveProgress.active}
+									placeholder="Enter call letters"
+									on:keydown={(e) => e.key === 'Enter' && addPermission()}
+									on:input={(e) => {
+										// Force uppercase
+										const target = e.target as HTMLInputElement;
+										newPermission.callLetters = target.value.toUpperCase();
+									}}
+								/>
+								<select 
+									bind:value={newPermission.frequency}
+									disabled={saveProgress.active}
+								>
+									<option value="FM">FM</option>
+									<option value="AM">AM</option>
+								</select>
+							</div>
 						</div>
 						
 						<div class="form-field">
@@ -331,7 +368,6 @@ function getCallLettersFromTopic(topic: string): string {
 										bind:checked={newPermission.canReceive}
 										disabled={saveProgress.active}
 									/>
-									<span class="checkmark"></span>
 									Receive
 								</label>
 								<label class="checkbox-label">
@@ -340,7 +376,6 @@ function getCallLettersFromTopic(topic: string): string {
 										bind:checked={newPermission.canSend}
 										disabled={saveProgress.active}
 									/>
-									<span class="checkmark"></span>
 									Send
 								</label>
 							</div>
@@ -365,9 +400,10 @@ function getCallLettersFromTopic(topic: string): string {
 							</div>
 						{:else}
 							{#each userAcls as acl, index}
+								{@const callLettersInfo = getCallLettersFromTopic(acl.topic)}
 								<div class="permission-item">
 									<div class="permission-info">
-										<div class="call-letters">{getCallLettersFromTopic(acl.topic)}</div>
+										<div class="call-letters">{callLettersInfo.callLetters} {callLettersInfo.frequency}</div>
 										<div class="permission-type">{formatPermission(acl.permission)}</div>
 									</div>
 									<button 
@@ -556,6 +592,38 @@ function getCallLettersFromTopic(topic: string): string {
 	cursor: not-allowed;
 }
 
+.call-letters-group {
+	display: flex;
+	gap: 0.5rem;
+	align-items: stretch;
+}
+
+.call-letters-group input {
+	flex: 1;
+}
+
+.call-letters-group select {
+	padding: 0.75rem 1rem;
+	border: 1px solid #404040;
+	border-radius: 0.4rem;
+	font-size: 1rem;
+	background: #1a1a1a;
+	color: #e5e7eb;
+	transition: border-color 0.15s, background 0.15s;
+	cursor: pointer;
+}
+
+.call-letters-group select:focus {
+	border-color: #3b82f6;
+	background: #2d2d2d;
+	outline: none;
+}
+
+.call-letters-group select:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+
 /* Checkbox styles */
 .checkbox-group {
 	display: flex;
@@ -572,36 +640,27 @@ function getCallLettersFromTopic(topic: string): string {
 }
 
 .checkbox-label input[type="checkbox"] {
-	display: none;
-}
-
-.checkmark {
 	width: 20px;
 	height: 20px;
+	margin: 0;
+	cursor: pointer;
+	accent-color: #3b82f6;
+	background: #1a1a1a;
 	border: 2px solid #404040;
 	border-radius: 0.25rem;
-	background: #1a1a1a;
-	position: relative;
-	transition: all 0.15s;
 }
 
-.checkbox-label input[type="checkbox"]:checked + .checkmark {
+.checkbox-label input[type="checkbox"]:checked {
 	background: #3b82f6;
 	border-color: #3b82f6;
 }
 
-.checkbox-label input[type="checkbox"]:checked + .checkmark::after {
-	content: '✓';
-	position: absolute;
-	top: 50%;
-	left: 50%;
-	transform: translate(-50%, -50%);
-	color: white;
-	font-size: 14px;
-	font-weight: bold;
+.checkbox-label input[type="checkbox"]:focus {
+	outline: 2px solid #3b82f6;
+	outline-offset: 2px;
 }
 
-.checkbox-label:hover .checkmark {
+.checkbox-label:hover input[type="checkbox"] {
 	border-color: #3b82f6;
 }
 
