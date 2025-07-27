@@ -144,10 +144,48 @@ async function requireAdmin(request, env) {
 async function handleAdminApi(request, env) {
   const url = new URL(request.url);
   const origin = request.headers.get("Origin");
+  const userAgent = request.headers.get("User-Agent") || "";
+  const secFetchSite = request.headers.get("Sec-Fetch-Site");
+  const secFetchMode = request.headers.get("Sec-Fetch-Mode");
+  const secFetchDest = request.headers.get("Sec-Fetch-Dest");
 
-  // SECURITY: Block requests without valid origin header
+  // SECURITY: Block cross-origin requests from unauthorized domains
   const allowedOrigins = ['https://msgwrk-qt4g0063hh.cyber-comp.cc'];
-  if (!origin || !allowedOrigins.includes(origin)) {
+  if (origin && !allowedOrigins.includes(origin)) {
+    return new Response("Forbidden", { 
+      status: 403,
+      headers: {
+        "Content-Type": "text/plain",
+        "X-Content-Type-Options": "nosniff",
+        "Referrer-Policy": "no-referrer",
+      }
+    });
+  }
+
+  // SECURITY: Block non-browser requests (Postman, curl, etc.)
+  // Require Sec-Fetch-* headers which are only sent by legitimate browsers
+  // These headers are much harder to spoof than User-Agent
+  const hasSecFetchHeaders = secFetchSite && secFetchMode && secFetchDest;
+  
+  // Additional validation for Sec-Fetch-* headers
+  const isValidSecFetch = hasSecFetchHeaders && (
+    // Sec-Fetch-Site should be 'same-origin' for admin interface
+    secFetchSite === 'same-origin' ||
+    // Or 'same-site' for cross-site requests within the same domain
+    secFetchSite === 'same-site'
+  ) && (
+    // Sec-Fetch-Mode should be 'cors' for API requests
+    secFetchMode === 'cors' ||
+    // Or 'navigate' for page loads
+    secFetchMode === 'navigate'
+  ) && (
+    // Sec-Fetch-Dest should be 'empty' for API requests
+    secFetchDest === 'empty' ||
+    // Or 'document' for page loads
+    secFetchDest === 'document'
+  );
+
+  if (!isValidSecFetch) {
     return new Response("Forbidden", { 
       status: 403,
       headers: {
