@@ -1,6 +1,21 @@
 import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from 'jose';
 
+// Base64 decoder for Cloudflare Workers
+function base64Decode(str) {
+  try {
+    return new Uint8Array(Buffer.from(str, 'base64'));
+  } catch (e) {
+    // Fallback for environments without Buffer
+    const binaryString = atob(str);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes;
+  }
+}
+
 // Web Crypto API password hashing functions
 async function hashPassword(password) {
   const encoder = new TextEncoder();
@@ -30,8 +45,8 @@ async function hashPassword(password) {
 }
 
 async function verifyPassword(password, hash) {
-  // Check if it's a bcrypt hash (starts with $2b$)
-  if (hash.startsWith('$2b$')) {
+  // Check if it's a bcrypt hash (starts with $2a$ or $2b$)
+  if (hash.startsWith('$2a$') || hash.startsWith('$2b$')) {
     try {
       return await bcrypt.compare(password, hash);
     } catch (e) {
@@ -55,8 +70,8 @@ async function verifyPassword(password, hash) {
   
   try {
     const encoder = new TextEncoder();
-    const salt = new Uint8Array(atob(saltB64).split('').map(c => c.charCodeAt(0)));
-    const storedHash = new Uint8Array(atob(hashB64).split('').map(c => c.charCodeAt(0)));
+    const salt = base64Decode(saltB64);
+    const storedHash = base64Decode(hashB64);
     
     const keyMaterial = await crypto.subtle.importKey(
       'raw',
@@ -802,6 +817,8 @@ async function handleAdminApi(request, env) {
         return jsonResponse({ error: "Corrupt admin data" }, 500, origin);
       }
       
+      console.log(`[DEBUG] Admin hash starts with: ${adminRecord.password_hash.substring(0, 10)}`);
+      
       const ok = await verifyPassword(sanitizedPassword, adminRecord.password_hash);
       
       if (!ok) {
@@ -811,7 +828,7 @@ async function handleAdminApi(request, env) {
       }
       
       // Migrate admin user from bcrypt to PBKDF2 on first successful login
-      if (adminRecord.password_hash.startsWith('$2b$')) {
+      if (adminRecord.password_hash.startsWith('$2a$') || adminRecord.password_hash.startsWith('$2b$')) {
         console.log(`[MIGRATION] Migrating admin user ${sanitizedUsername} from bcrypt to PBKDF2`);
         const newHash = await hashPassword(sanitizedPassword);
         adminRecord.password_hash = newHash;
