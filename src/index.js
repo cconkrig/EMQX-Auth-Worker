@@ -1,5 +1,84 @@
-import { argon2id } from "argon2-browser";
+import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from 'jose';
+
+// Web Crypto API password hashing functions
+async function hashPassword(password) {
+  const encoder = new TextEncoder();
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(password),
+    'PBKDF2',
+    false,
+    ['deriveBits']
+  );
+  const hash = await crypto.subtle.deriveBits(
+    {
+      name: 'PBKDF2',
+      salt: salt,
+      iterations: 100000,
+      hash: 'SHA-256'
+    },
+    keyMaterial,
+    256
+  );
+  
+  // Store as base64: pbkdf2$iterations$salt$hash
+  const saltB64 = btoa(String.fromCharCode(...salt));
+  const hashB64 = btoa(String.fromCharCode(...new Uint8Array(hash)));
+  return `pbkdf2$100000$${saltB64}$${hashB64}`;
+}
+
+async function verifyPassword(password, hash) {
+  // Check if it's a bcrypt hash (starts with $2b$)
+  if (hash.startsWith('$2b$')) {
+    return await bcrypt.compare(password, hash);
+  }
+  
+  // PBKDF2 hash format: pbkdf2$iterations$salt$hash
+  if (!hash.startsWith('pbkdf2$')) {
+    return false;
+  }
+  
+  const parts = hash.split('$');
+  if (parts.length !== 4) {
+    return false;
+  }
+  
+  const iterations = parseInt(parts[1]);
+  const saltB64 = parts[2];
+  const hashB64 = parts[3];
+  
+  try {
+    const encoder = new TextEncoder();
+    const salt = new Uint8Array(atob(saltB64).split('').map(c => c.charCodeAt(0)));
+    const storedHash = new Uint8Array(atob(hashB64).split('').map(c => c.charCodeAt(0)));
+    
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(password),
+      'PBKDF2',
+      false,
+      ['deriveBits']
+    );
+    const computedHash = await crypto.subtle.deriveBits(
+      {
+        name: 'PBKDF2',
+        salt: salt,
+        iterations: iterations,
+        hash: 'SHA-256'
+      },
+      keyMaterial,
+      256
+    );
+    
+    // Timing-safe comparison
+    return crypto.subtle.timingSafeEqual(storedHash, new Uint8Array(computedHash));
+  } catch (e) {
+    console.log('[AUTH] Error verifying PBKDF2 hash:', e.message);
+    return false;
+  }
+}
 
 // CORS and security headers - dynamically set based on origin
 function getCorsHeaders(origin) {
@@ -643,12 +722,7 @@ async function handleAdminApi(request, env) {
       }
 
       // Create admin user
-      const hash = await argon2id.hash(sanitizedPassword, {
-        timeCost: 3, // CPU/memory cost (much faster than bcrypt cost 12)
-        memoryCost: 1024, // 1MB memory usage
-        parallelism: 1, // Single thread
-        hashLength: 32, // 32 bytes output
-      });
+      const hash = await hashPassword(sanitizedPassword);
       const adminObj = { 
         password_hash: hash, 
         roles: ["admin"],
@@ -724,21 +798,21 @@ async function handleAdminApi(request, env) {
         console.log(`[SECURITY] Failed login attempt - corrupt data: ${sanitizedUsername} from IP ${ip}`);
         return jsonResponse({ error: "Corrupt admin data" }, 500, origin);
       }
-      const ok = await argon2id.verify(adminRecord.password_hash, sanitizedPassword);
+      const ok = await verifyPassword(sanitizedPassword, adminRecord.password_hash);
       if (!ok) {
-        // Try bcrypt migration if Argon2 fails
-        if (adminRecord.password_hash.startsWith('$2b$') || adminRecord.password_hash.startsWith('$2a$')) {
-          const migrated = await migrateBcryptToArgon2(sanitizedPassword, adminRecord.password_hash, env, sanitizedUsername);
-          if (!migrated) {
-            incrementAdminLoginAttempts(ip, sanitizedUsername);
-            console.log(`[SECURITY] Failed login attempt - invalid password: ${sanitizedUsername} from IP ${ip}`);
-            return jsonResponse({ error: "Invalid credentials" }, 401, origin);
-          }
-        } else {
-          incrementAdminLoginAttempts(ip, sanitizedUsername);
-          console.log(`[SECURITY] Failed login attempt - invalid password: ${sanitizedUsername} from IP ${ip}`);
-          return jsonResponse({ error: "Invalid credentials" }, 401, origin);
-        }
+        incrementAdminLoginAttempts(ip, sanitizedUsername);
+        console.log(`[SECURITY] Failed login attempt - invalid password: ${sanitizedUsername} from IP ${ip}`);
+        return jsonResponse({ error: "Invalid credentials" }, 401, origin);
+      }
+      
+      // Migrate admin user from bcrypt to PBKDF2 on first successful login
+      if (adminRecord.password_hash.startsWith('$2b$')) {
+        console.log(`[MIGRATION] Migrating admin user ${sanitizedUsername} from bcrypt to PBKDF2`);
+        const newHash = await hashPassword(sanitizedPassword);
+        adminRecord.password_hash = newHash;
+        adminRecord.updated_at = new Date().toISOString();
+        await env.USERS.put(`admin:${sanitizedUsername}`, JSON.stringify(adminRecord));
+        console.log(`[MIGRATION] Successfully migrated admin user ${sanitizedUsername}`);
       }
     
     // Generate session ID and store session metadata
@@ -876,12 +950,7 @@ async function handleAdminApi(request, env) {
         validatedAcls = acls;
       }
       
-      const hash = await argon2id.hash(sanitizedPassword, {
-        timeCost: 3, // CPU/memory cost (much faster than bcrypt cost 12)
-        memoryCost: 1024, // 1MB memory usage
-        parallelism: 1, // Single thread
-        hashLength: 32, // 32 bytes output
-      });
+      const hash = await hashPassword(sanitizedPassword);
       const userObj = { 
         password_hash: hash, 
         acls: validatedAcls,
@@ -1356,22 +1425,12 @@ export default {
       const origin = request.headers.get("Origin");
 
       if (url.pathname === "/auth" && request.method === "POST") {
-        // Check rate limit FIRST to avoid expensive operations
         if (isRateLimited(ip)) {
           return jsonResponse({ result: "deny", reason: "Rate limit exceeded" }, 429, origin);
         }
-        
         const { username, password } = await request.json();
         log(url.pathname, "Auth attempt for", username);
 
-        // Quick validation first
-        if (!username || !password || typeof username !== "string" || typeof password !== "string") {
-          log(url.pathname, "Invalid username or password format");
-          incrementRateLimit(ip);
-          return jsonResponse({ result: "deny", reason: "Invalid credentials" }, 400, origin);
-        }
-
-        // More thorough validation only if basic check passes
         if (!validateUsername(username) || !validatePassword(password)) {
           log(url.pathname, "Invalid username or password format");
           incrementRateLimit(ip);
@@ -1401,17 +1460,7 @@ export default {
           return jsonResponse({ result: "deny" }, 200, origin);
         }
 
-        // Try Argon2 first (new format)
-        let ok = false;
-        try {
-          ok = await argon2id.verify(hash, password);
-        } catch (e) {
-          // If Argon2 fails, try bcrypt (old format) and migrate if successful
-          if (hash.startsWith('$2b$') || hash.startsWith('$2a$')) {
-            ok = await migrateBcryptToArgon2(password, hash, env, username);
-          }
-        }
-        
+        const ok = await verifyPassword(password, hash);
         log(url.pathname, "Password check for", username, ok ? "OK" : "FAIL");
         if (!ok) {
           incrementRateLimit(ip);
@@ -1487,40 +1536,4 @@ function topicMatches(pattern, topic) {
     if (patternParts[i] !== topicParts[i]) return false;
   }
   return i === topicParts.length;
-}
-
-// Migration helper for bcrypt to Argon2
-async function migrateBcryptToArgon2(password, hash, env, username) {
-  try {
-    // Try to verify with bcrypt first
-    const bcrypt = await import("bcryptjs");
-    const isValid = await bcrypt.compare(password, hash);
-    
-    if (isValid) {
-      // Hash is valid, migrate to Argon2
-      const newHash = await argon2id.hash(password, {
-        timeCost: 3,
-        memoryCost: 1024,
-        parallelism: 1,
-        hashLength: 32,
-      });
-      
-      // Update the user's hash in KV
-      const userKey = username.startsWith('admin:') ? `admin:${username}` : `user:${username}`;
-      const userRaw = await env.USERS.get(userKey);
-      if (userRaw) {
-        let user = JSON.parse(userRaw);
-        user.password_hash = newHash;
-        user.updated_at = new Date().toISOString();
-        await env.USERS.put(userKey, JSON.stringify(user));
-        console.log(`[MIGRATION] Migrated ${username} from bcrypt to Argon2`);
-      }
-      
-      return true;
-    }
-    return false;
-  } catch (e) {
-    console.log(`[MIGRATION] Error migrating ${username}:`, e.message);
-    return false;
-  }
 }
