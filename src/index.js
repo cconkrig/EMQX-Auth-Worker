@@ -32,7 +32,11 @@ async function hashPassword(password) {
 async function verifyPassword(password, hash) {
   // Check if it's a bcrypt hash (starts with $2b$)
   if (hash.startsWith('$2b$')) {
-    return await bcrypt.compare(password, hash);
+    try {
+      return await bcrypt.compare(password, hash);
+    } catch (e) {
+      return false;
+    }
   }
   
   // PBKDF2 hash format: pbkdf2$iterations$salt$hash
@@ -75,7 +79,6 @@ async function verifyPassword(password, hash) {
     // Timing-safe comparison
     return crypto.subtle.timingSafeEqual(storedHash, new Uint8Array(computedHash));
   } catch (e) {
-    console.log('[AUTH] Error verifying PBKDF2 hash:', e.message);
     return false;
   }
 }
@@ -798,7 +801,9 @@ async function handleAdminApi(request, env) {
         console.log(`[SECURITY] Failed login attempt - corrupt data: ${sanitizedUsername} from IP ${ip}`);
         return jsonResponse({ error: "Corrupt admin data" }, 500, origin);
       }
+      
       const ok = await verifyPassword(sanitizedPassword, adminRecord.password_hash);
+      
       if (!ok) {
         incrementAdminLoginAttempts(ip, sanitizedUsername);
         console.log(`[SECURITY] Failed login attempt - invalid password: ${sanitizedUsername} from IP ${ip}`);
