@@ -1,4 +1,4 @@
-import bcrypt from "bcryptjs";
+import { argon2id } from "argon2-browser";
 import { SignJWT, jwtVerify } from 'jose';
 
 // CORS and security headers - dynamically set based on origin
@@ -643,7 +643,12 @@ async function handleAdminApi(request, env) {
       }
 
       // Create admin user
-      const hash = await bcrypt.hash(sanitizedPassword, 12);
+      const hash = await argon2id.hash(sanitizedPassword, {
+        timeCost: 3, // CPU/memory cost (much faster than bcrypt cost 12)
+        memoryCost: 1024, // 1MB memory usage
+        parallelism: 1, // Single thread
+        hashLength: 32, // 32 bytes output
+      });
       const adminObj = { 
         password_hash: hash, 
         roles: ["admin"],
@@ -719,11 +724,21 @@ async function handleAdminApi(request, env) {
         console.log(`[SECURITY] Failed login attempt - corrupt data: ${sanitizedUsername} from IP ${ip}`);
         return jsonResponse({ error: "Corrupt admin data" }, 500, origin);
       }
-      const ok = await bcrypt.compare(sanitizedPassword, adminRecord.password_hash);
+      const ok = await argon2id.verify(adminRecord.password_hash, sanitizedPassword);
       if (!ok) {
-        incrementAdminLoginAttempts(ip, sanitizedUsername);
-        console.log(`[SECURITY] Failed login attempt - invalid password: ${sanitizedUsername} from IP ${ip}`);
-        return jsonResponse({ error: "Invalid credentials" }, 401, origin);
+        // Try bcrypt migration if Argon2 fails
+        if (adminRecord.password_hash.startsWith('$2b$') || adminRecord.password_hash.startsWith('$2a$')) {
+          const migrated = await migrateBcryptToArgon2(sanitizedPassword, adminRecord.password_hash, env, sanitizedUsername);
+          if (!migrated) {
+            incrementAdminLoginAttempts(ip, sanitizedUsername);
+            console.log(`[SECURITY] Failed login attempt - invalid password: ${sanitizedUsername} from IP ${ip}`);
+            return jsonResponse({ error: "Invalid credentials" }, 401, origin);
+          }
+        } else {
+          incrementAdminLoginAttempts(ip, sanitizedUsername);
+          console.log(`[SECURITY] Failed login attempt - invalid password: ${sanitizedUsername} from IP ${ip}`);
+          return jsonResponse({ error: "Invalid credentials" }, 401, origin);
+        }
       }
     
     // Generate session ID and store session metadata
@@ -861,7 +876,12 @@ async function handleAdminApi(request, env) {
         validatedAcls = acls;
       }
       
-      const hash = await bcrypt.hash(sanitizedPassword, 12);
+      const hash = await argon2id.hash(sanitizedPassword, {
+        timeCost: 3, // CPU/memory cost (much faster than bcrypt cost 12)
+        memoryCost: 1024, // 1MB memory usage
+        parallelism: 1, // Single thread
+        hashLength: 32, // 32 bytes output
+      });
       const userObj = { 
         password_hash: hash, 
         acls: validatedAcls,
@@ -1336,12 +1356,22 @@ export default {
       const origin = request.headers.get("Origin");
 
       if (url.pathname === "/auth" && request.method === "POST") {
+        // Check rate limit FIRST to avoid expensive operations
         if (isRateLimited(ip)) {
           return jsonResponse({ result: "deny", reason: "Rate limit exceeded" }, 429, origin);
         }
+        
         const { username, password } = await request.json();
         log(url.pathname, "Auth attempt for", username);
 
+        // Quick validation first
+        if (!username || !password || typeof username !== "string" || typeof password !== "string") {
+          log(url.pathname, "Invalid username or password format");
+          incrementRateLimit(ip);
+          return jsonResponse({ result: "deny", reason: "Invalid credentials" }, 400, origin);
+        }
+
+        // More thorough validation only if basic check passes
         if (!validateUsername(username) || !validatePassword(password)) {
           log(url.pathname, "Invalid username or password format");
           incrementRateLimit(ip);
@@ -1371,7 +1401,17 @@ export default {
           return jsonResponse({ result: "deny" }, 200, origin);
         }
 
-        const ok = await bcrypt.compare(password, hash);
+        // Try Argon2 first (new format)
+        let ok = false;
+        try {
+          ok = await argon2id.verify(hash, password);
+        } catch (e) {
+          // If Argon2 fails, try bcrypt (old format) and migrate if successful
+          if (hash.startsWith('$2b$') || hash.startsWith('$2a$')) {
+            ok = await migrateBcryptToArgon2(password, hash, env, username);
+          }
+        }
+        
         log(url.pathname, "Password check for", username, ok ? "OK" : "FAIL");
         if (!ok) {
           incrementRateLimit(ip);
@@ -1447,4 +1487,40 @@ function topicMatches(pattern, topic) {
     if (patternParts[i] !== topicParts[i]) return false;
   }
   return i === topicParts.length;
+}
+
+// Migration helper for bcrypt to Argon2
+async function migrateBcryptToArgon2(password, hash, env, username) {
+  try {
+    // Try to verify with bcrypt first
+    const bcrypt = await import("bcryptjs");
+    const isValid = await bcrypt.compare(password, hash);
+    
+    if (isValid) {
+      // Hash is valid, migrate to Argon2
+      const newHash = await argon2id.hash(password, {
+        timeCost: 3,
+        memoryCost: 1024,
+        parallelism: 1,
+        hashLength: 32,
+      });
+      
+      // Update the user's hash in KV
+      const userKey = username.startsWith('admin:') ? `admin:${username}` : `user:${username}`;
+      const userRaw = await env.USERS.get(userKey);
+      if (userRaw) {
+        let user = JSON.parse(userRaw);
+        user.password_hash = newHash;
+        user.updated_at = new Date().toISOString();
+        await env.USERS.put(userKey, JSON.stringify(user));
+        console.log(`[MIGRATION] Migrated ${username} from bcrypt to Argon2`);
+      }
+      
+      return true;
+    }
+    return false;
+  } catch (e) {
+    console.log(`[MIGRATION] Error migrating ${username}:`, e.message);
+    return false;
+  }
 }
