@@ -987,6 +987,80 @@ async function handleAdminApi(request, env) {
       return jsonResponse({ error: e.message || 'Error creating/updating user' }, 500, origin);
     }
   }
+  if (url.pathname === "/admin/api/user" && request.method === "PUT") {
+    try {
+      const payload = await request.json();
+      
+      // Validate JSON payload
+      if (!validateJsonPayload(payload)) {
+        return jsonResponse({ error: "Invalid request payload" }, 400, origin);
+      }
+      
+      const { username, password, newUsername } = payload;
+      
+      // Validate required fields
+      if (!username || !password) {
+        return jsonResponse({ error: "Missing username or password" }, 400, origin);
+      }
+      
+      // Sanitize and validate inputs
+      const sanitizedUsername = sanitizeUsername(username);
+      const sanitizedPassword = sanitizePassword(password);
+      const sanitizedNewUsername = newUsername ? sanitizeUsername(newUsername) : null;
+      
+      if (!sanitizedUsername) {
+        return jsonResponse({ error: "Invalid username format" }, 400, origin);
+      }
+      
+      if (!sanitizedPassword) {
+        return jsonResponse({ error: "Invalid password format" }, 400, origin);
+      }
+      
+      if (newUsername && !sanitizedNewUsername) {
+        return jsonResponse({ error: "Invalid new username format" }, 400, origin);
+      }
+      
+      // Check if user exists
+      const userRaw = await env.USERS.get(`user:${sanitizedUsername}`);
+      if (!userRaw) {
+        return jsonResponse({ error: "User not found" }, 404, origin);
+      }
+      
+      let user;
+      try { 
+        user = JSON.parse(userRaw); 
+      } catch { 
+        return jsonResponse({ error: "Corrupt user data" }, 500, origin); 
+      }
+      
+      // Update password with PBKDF2 hash
+      const newHash = await hashPassword(sanitizedPassword);
+      user.password_hash = newHash;
+      user.updated_at = new Date().toISOString();
+      
+      // Handle username change if provided
+      if (sanitizedNewUsername && sanitizedNewUsername !== sanitizedUsername) {
+        // Check if new username already exists
+        const existingUser = await env.USERS.get(`user:${sanitizedNewUsername}`);
+        if (existingUser) {
+          return jsonResponse({ error: "New username already exists" }, 409, origin);
+        }
+        
+        // Delete old user record and create new one
+        await env.USERS.delete(`user:${sanitizedUsername}`);
+        await env.USERS.put(`user:${sanitizedNewUsername}`, JSON.stringify(user));
+        audit(admin.username, 'update_user_password_and_username', `${sanitizedUsername} -> ${sanitizedNewUsername}`);
+        return jsonResponse({ success: true, newUsername: sanitizedNewUsername }, 200, origin);
+      } else {
+        // Just update password
+        await env.USERS.put(`user:${sanitizedUsername}`, JSON.stringify(user));
+        audit(admin.username, 'update_user_password', sanitizedUsername);
+        return jsonResponse({ success: true }, 200, origin);
+      }
+    } catch (e) {
+      return jsonResponse({ error: e.message || 'Error updating user' }, 500, origin);
+    }
+  }
   if (url.pathname === "/admin/api/user" && request.method === "DELETE") {
     try {
       const payload = await request.json();
